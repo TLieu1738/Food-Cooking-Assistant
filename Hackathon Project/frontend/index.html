@@ -29,6 +29,13 @@
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const status = document.getElementById("status");
+    //Hardcoded user profile for testing
+    const userProfile = {
+      age: 35,
+      goal: "Bulking",
+      diet: "high protein",
+      activity_level: "moderate"
+    };
 
     async function init() {
       const stream = await navigator.mediaDevices.getUserMedia(
@@ -56,6 +63,27 @@
       });
       const data = await res.json();
       showResults(data);
+
+      //Call AI nutrition coach
+      status.textContent = "Getting nutrition advice, bear with me gng";
+
+      const coachRes = await fetch("/nutrition-coach", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-broswer-warning": "true"
+        },
+        body: JSON.stringify({
+          userProfile: userProfile,
+          food_data: data
+        })
+
+      });
+
+      const advice = await coachRes.json();
+
+      showCoachAdvice(advice);
+      status.textContext = "Done!";
     }
 
     function showResults(data) {
@@ -81,6 +109,31 @@
         </div>`;
       });
       document.getElementById("result").innerHTML = html;
+    }
+
+    function showCoachAdvice(advice) {
+
+      if (advice.error) return;
+      
+      let html = `
+        <div class="card">
+          <div class="food-title"> AI Nutrition Coach</div>
+          <div class="meta"><b>Health Score:</b> ${advice.health_score}/10</div>
+          <div class="meta">${advice.summary}</div>
+
+          <div class="recipe-name"> Good Points</div>
+          <ul>${advice.good_points.map(p => `<li>${p}</li>`).join("")}</ul>
+
+          <div class="recipe-name"> Improvements</div>
+          <ul>${advice.improvements.map(p => `<li>${p}</li>`).join("")}</ul>
+
+          <div class="meta"><b>Next Meal:</b> ${advice.next_meal_suggestion}</div>
+        </div>
+      `;
+
+      document.getElementById("result").innerHTML += html;
+
+
     }
 
     init();
