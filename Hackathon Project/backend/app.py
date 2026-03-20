@@ -3,6 +3,9 @@ from flask_cors import CORS
 import anthropic
 import os, json
 from dotenv import load_dotenv
+from dbClient import supabase
+
+
 
 load_dotenv()
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
