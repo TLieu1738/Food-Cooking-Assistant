@@ -10,12 +10,13 @@ export default function Home({ navigate }) {
 
   useEffect(() => { refresh(); }, []);
 
-  function refresh() {
-    setMeals(getTodaysMeals());
+  async function refresh() {
+    const data = await getTodaysMeals();
+    setMeals(data);
   }
 
-  function handleDelete(id) {
-    deleteMeal(id);
+  async function handleDelete(id) {
+    await deleteMeal(id);
     refresh();
   }
 

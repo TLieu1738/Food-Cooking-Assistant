@@ -1,29 +1,37 @@
-const KEY = 'nutriscan_meals';
+const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
-export function getAllMeals() {
-  return JSON.parse(localStorage.getItem(KEY) || '[]');
-}
-
-export function getTodaysMeals() {
-  const todayStr = new Date().toISOString().slice(0, 10);
-  return getAllMeals().filter(m => m.timestamp.slice(0, 10) === todayStr);
-}
-
-export function saveMeal(meal) {
-  const all = getAllMeals();
-  const newMeal = {
-    ...meal,
-    id: Date.now(),
-    timestamp: new Date().toISOString()
+function authHeaders() {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
   };
-  all.push(newMeal);
-  localStorage.setItem(KEY, JSON.stringify(all));
-  return newMeal;
 }
 
-export function deleteMeal(id) {
-  const all = getAllMeals().filter(m => m.id !== id);
-  localStorage.setItem(KEY, JSON.stringify(all));
+export async function getTodaysMeals() {
+  const res = await fetch(`${BACKEND}/get-meals`, { headers: authHeaders() });
+  const data = await res.json();
+  if (data.error) return [];
+  return data.map(m => ({
+    ...m,
+    timestamp: m.logged_at
+  }));
+}
+
+export async function saveMeal(meal) {
+  const res = await fetch(`${BACKEND}/log-meal`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ ...meal, timestamp: new Date().toISOString() })
+  });
+  return res.json();
+}
+
+export async function deleteMeal(id) {
+  await fetch(`${BACKEND}/delete-meal/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders()
+  });
 }
 
 export function getTotals(meals) {

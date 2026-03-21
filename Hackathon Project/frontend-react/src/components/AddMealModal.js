@@ -7,9 +7,9 @@ export default function AddMealModal({ onClose, onSaved }) {
   const [protein, setProtein] = useState('');
   const [cost, setCost] = useState('');
 
-  function handleSave() {
+  async function handleSave() {
     if (!name.trim()) return;
-    saveMeal({
+    await saveMeal({
       food_name: name.trim(),
       calories: parseInt(cal) || 0,
       protein_g: parseInt(protein) || 0,

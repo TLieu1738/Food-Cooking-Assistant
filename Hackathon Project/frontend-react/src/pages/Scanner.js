@@ -3,16 +3,29 @@ import { saveMeal } from '../utils/storage';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
 
+const userProfile = {
+  age: 35,
+  goal: "Bulking",
+  diet: "high protein",
+  activity_level: "moderate"
+};
+
 export default function Scanner({ navigate }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [status, setStatus] = useState('Starting camera...');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [advice, setAdvice] = useState(null);
   const [addedToLog, setAddedToLog] = useState(false);
 
   useEffect(() => {
     initCamera();
+    const video = videoRef.current;
+    return () => {
+      const stream = video?.srcObject;
+      if (stream) stream.getTracks().forEach(t => t.stop());
+    };
   }, []);
 
   async function initCamera() {
@@ -28,6 +41,7 @@ export default function Scanner({ navigate }) {
   async function scan() {
     setLoading(true);
     setResult(null);
+    setAdvice(null);
     setAddedToLog(false);
     setStatus('Analysing with Claude Vision...');
 
@@ -46,7 +60,24 @@ export default function Scanner({ navigate }) {
       });
       const data = await res.json();
       setResult(data);
-      setStatus(data.error === 'not_food' ? '' : 'Done! Add to your log below.');
+
+      if (data.error === 'not_food') {
+        setStatus('');
+        setLoading(false);
+        return;
+      }
+
+      setStatus('Getting nutrition advice, bear with me gng...');
+
+      const coachRes = await fetch(`${BACKEND}/nutrition-coach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({ user_profile: userProfile, food_data: data })
+      });
+      const coachData = await coachRes.json();
+      setAdvice(coachData);
+      setStatus('Done! Add to your log below.');
+
     } catch {
       setStatus('Error connecting to server — is Flask running?');
     }
@@ -145,6 +176,7 @@ export default function Scanner({ navigate }) {
               </button>
             </div>
 
+            {/* RECIPES */}
             {result.recipes.map((r, i) => (
               <div key={i} className="card fade-in">
                 <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{r.name}</div>
@@ -156,6 +188,49 @@ export default function Scanner({ navigate }) {
                 </ol>
               </div>
             ))}
+
+            {/* AI NUTRITION COACH */}
+            {advice && !advice.error && (
+              <div className="card fade-in" style={{ border: '1px solid rgba(200,240,74,0.3)' }}>
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 800, marginBottom: 12 }}>
+                  🤖 AI Nutrition Coach
+                </div>
+
+                {/* Health Score */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <div style={{
+                    background: 'var(--accent)', color: '#0a0a0a',
+                    borderRadius: 10, padding: '6px 14px',
+                    fontFamily: 'Syne, sans-serif', fontSize: 20, fontWeight: 800
+                  }}>
+                    {advice.health_score}/10
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>{advice.summary}</div>
+                </div>
+
+                {/* Good Points */}
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 700, marginBottom: 6, color: 'var(--accent)' }}>
+                  ✅ Good Points
+                </div>
+                <ul style={{ paddingLeft: 18, fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 12 }}>
+                  {advice.good_points.map((p, i) => <li key={i}>{p}</li>)}
+                </ul>
+
+                {/* Improvements */}
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 700, marginBottom: 6, color: '#ff9a3c' }}>
+                  ⚡ Improvements
+                </div>
+                <ul style={{ paddingLeft: 18, fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 12 }}>
+                  {advice.improvements.map((p, i) => <li key={i}>{p}</li>)}
+                </ul>
+
+                {/* Next Meal */}
+                <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 12, fontSize: 13 }}>
+                  <span style={{ fontWeight: 700 }}>🍽 Next meal: </span>
+                  <span style={{ color: 'var(--muted)' }}>{advice.next_meal_suggestion}</span>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

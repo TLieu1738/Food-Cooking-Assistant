@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import anthropic
 import os, json
+from datetime import date, datetime
 from dotenv import load_dotenv
 from coach import get_nutrition_advice
 from dbClient import supabase
@@ -176,6 +177,68 @@ def protected():
         return {"error": "Invalid token"}, 401
 
     return {"message": "You are logged in!"}
+
+@app.route("/log-meal", methods=["POST"])
+def log_meal():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return jsonify({"error": "No token"}), 401
+
+    user_response = supabase.auth.get_user(token)
+    if not user_response or not user_response.user:
+        return jsonify({"error": "Invalid token"}), 401
+
+    data = request.json
+    meal = {
+        "user_id": user_response.user.id,
+        "food_name": data.get("food_name", ""),
+        "calories": data.get("calories", 0),
+        "protein_g": data.get("protein_g", 0),
+        "carbs_g": data.get("carbs_g", 0),
+        "fat_g": data.get("fat_g", 0),
+        "cost": data.get("cost", 0),
+        "logged_at": data.get("timestamp", datetime.utcnow().isoformat()),
+    }
+
+    result = supabase.table("meals").insert(meal).execute()
+    return jsonify(result.data[0] if result.data else meal)
+
+
+@app.route("/get-meals", methods=["GET"])
+def get_meals():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return jsonify({"error": "No token"}), 401
+
+    user_response = supabase.auth.get_user(token)
+    if not user_response or not user_response.user:
+        return jsonify({"error": "Invalid token"}), 401
+
+    today = date.today().isoformat()
+    result = supabase.table("meals").select("*") \
+        .eq("user_id", user_response.user.id) \
+        .gte("logged_at", today) \
+        .order("logged_at") \
+        .execute()
+    return jsonify(result.data)
+
+
+@app.route("/delete-meal/<meal_id>", methods=["DELETE"])
+def delete_meal(meal_id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return jsonify({"error": "No token"}), 401
+
+    user_response = supabase.auth.get_user(token)
+    if not user_response or not user_response.user:
+        return jsonify({"error": "Invalid token"}), 401
+
+    supabase.table("meals").delete() \
+        .eq("id", meal_id) \
+        .eq("user_id", user_response.user.id) \
+        .execute()
+    return jsonify({"ok": True})
+
 
 #AI nutrition coach route
 @app.route("/nutrition-coach", methods=["POST"])
