@@ -72,6 +72,13 @@ export default function Home({ navigate }) {
           </div>
           <span style={{ fontSize: 20 }}>→</span>
         </button>
+        <button className="btn-primary" onClick={() => navigate('ingredients')}>
+          <div>
+            <div>Scan Ingredients</div>
+            <div className="btn-sub">Identify ingredients with your camera</div>
+          </div>
+          <span style={{ fontSize: 20 }}>→</span>
+        </button>
         <button className="btn-secondary" onClick={() => navigate('log')}>
           <div>
             <div>Meal Log</div>

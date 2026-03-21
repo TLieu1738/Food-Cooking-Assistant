@@ -80,6 +80,62 @@ If it does contain food or drink, identify what it is and respond with ONLY vali
     clean = response.content[0].text.strip().strip("```json").strip("```").strip()
     return jsonify(json.loads(clean))
 
+@app.route("/from-ingredients", methods=["POST"])
+def from_ingredients():
+    image_b64 = request.json.get("image")
+    if not image_b64:
+        return jsonify({"error": "no_image"})
+
+    prompt = """Look at this image. If it does not contain food ingredients, respond with exactly:
+{"error": "not_ingredients"}
+
+If it does contain ingredients, identify them all and respond with ONLY valid JSON, no extra text:
+{
+  "ingredients_detected": ["ingredient 1", "ingredient 2"],
+  "dishes": [
+    {
+      "name": "Dish name",
+      "uses_ingredients": ["ingredient 1", "ingredient 2"],
+      "missing_ingredients": ["optional extras you'd need"],
+      "difficulty": "easy",
+      "time_minutes": 20,
+      "cost_gbp": 2.50,
+      "nutrition": {
+        "calories_per_serving": 450,
+        "protein_g": 22,
+        "carbs_g": 40,
+        "fat_g": 14,
+        "fibre_g": 5,
+        "health_score": 7
+      },
+      "steps": ["Step 1", "Step 2", "Step 3"]
+    }
+  ]
+}
+
+health_score is 1–10 (10 = extremely nutritious). Return 3 dishes ranked by how well they use the available ingredients."""
+
+    response = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=2048,
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": image_b64
+                    }
+                },
+                {"type": "text", "text": prompt}
+            ]
+        }]
+    )
+    clean = response.content[0].text.strip().strip("```json").strip("```").strip()
+    return jsonify(json.loads(clean))
+
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.json
