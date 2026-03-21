@@ -104,7 +104,7 @@ export default function Scanner({ navigate }) {
           protein_g: result.macros.protein_g,
           carbs_g: result.macros.carbs_g,
           fat_g: result.macros.fat_g,
-          cost: result.cost_per_serving_gbp,
+          cost_gbp: result.cost_per_serving_gbp,
           advice: advice
         })
       });
