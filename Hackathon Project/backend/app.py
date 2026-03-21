@@ -527,4 +527,45 @@ Be concise, practical, and conversational. Focus only on food, nutrition, cookin
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000) 
+    app.run(debug=True, host="0.0.0.0", port=5000)
+
+# Add these routes to your existing app.py
+
+@app.route("/goals", methods=["GET"])
+def get_goals():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return jsonify({"error": "No token"}), 401
+    try:
+        user = supabase.auth.get_user(token)
+        user_id = user.user.id
+        result = supabase.table("goals").select("*").eq("user_id", user_id).single().execute()
+        if result.data:
+            return jsonify(result.data)
+        # No goals set yet — return defaults
+        return jsonify({ "calories": 2000, "protein": 150, "budget": 50.00 })
+    except Exception as e:
+        return jsonify({ "calories": 2000, "protein": 150, "budget": 50.00 })
+
+
+@app.route("/goals", methods=["POST"])
+def save_goals():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return jsonify({"error": "No token"}), 401
+    try:
+        user = supabase.auth.get_user(token)
+        user_id = user.user.id
+        data = request.json
+        payload = {
+            "user_id": user_id,
+            "calories": int(data.get("calories", 2000)),
+            "protein": int(data.get("protein", 150)),
+            "budget": float(data.get("budget", 50.00)),
+            "updated_at": "now()"
+        }
+        # Upsert — insert if no row, update if one exists
+        result = supabase.table("goals").upsert(payload, on_conflict="user_id").execute()
+        return jsonify(result.data[0])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

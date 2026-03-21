@@ -11,79 +11,43 @@ export default function Home({ navigate }) {
   const [meals, setMeals] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [friendEmail, setFriendEmail] = useState("");
-  const [message, setMessage] = useState("");
+  const [goals, setGoals] = useState({ calories: 2000, protein: 150, budget: 50 });
  
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+    fetchGoals();
+  }, []);
  
   async function refresh() {
     const data = await getTodaysMeals();
     setMeals(data);
   }
- 
+
+  async function fetchGoals() {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${BACKEND}/goals`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!data.error) setGoals(data);
+    } catch {
+      // Keep defaults
+    }
+  }
+
   async function handleDelete(id) {
     await deleteMeal(id);
     refresh();
   }
 
-  async function sendFriendRequest() {
-    try {
-      const res = await fetch(`${BACKEND}/friends/request`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          email: friendEmail
-        })
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessage("Friend request sent ✅");
-        setFriendEmail("");
-      } else {
-        setMessage(data.error || "Failed to send request");
-      }
-
-    } catch (err) {
-      setMessage("Server error");
-    }
-  }
-
-  async function acceptFriendRequest(requestId) {
-    try {
-      const res = await fetch(`${BACKEND}/friends/accept`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          request_id: requestId
-        })
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessage("Friend added 🎉");
-      } else {
-        setMessage(data.error || "Failed to accept");
-      }
-
-    } catch {
-      setMessage("Server error");
-    }
-  }
 
  
   const totals = getTotals(meals);
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'short', day: 'numeric', month: 'short'
   });
+
   const name = localStorage.getItem('username') || localStorage.getItem('user_email')?.split('@')[0] || '';
  
   return (
@@ -100,7 +64,7 @@ export default function Home({ navigate }) {
             <span /><span /><span />
           </button>
         </div>
- 
+
         <div className={`dropdown ${menuOpen ? 'open' : ''}`}>
           {[
             { icon: '👤', label: 'Profile',  sub: 'Edit your details',           route: 'profile' },
@@ -130,7 +94,7 @@ export default function Home({ navigate }) {
             </div>
           </button>
         </div>
- 
+
         {menuOpen && (
           <div
             style={{ position: 'fixed', inset: 0, zIndex: 250 }}
@@ -138,7 +102,7 @@ export default function Home({ navigate }) {
           />
         )}
       </div>
- 
+
       {/* HERO */}
       <div style={{ padding: '28px 20px 16px' }}>
         <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>Good day{name ? `, ${name}` : ''}</div>
@@ -147,7 +111,7 @@ export default function Home({ navigate }) {
           <span style={{ color: 'var(--accent)' }}>nutrition & budget</span>
         </div>
       </div>
- 
+
       {/* SUMMARY CARD */}
       <div style={{ margin: '0 20px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: 20 }}>
         <div style={{ fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>
@@ -167,29 +131,9 @@ export default function Home({ navigate }) {
             </div>
           ))}
         </div>
-        <CalorieBar current={totals.cal} />
+        <CalorieBar current={totals.cal} goal={goals.calories} />
       </div>
 
-      {/* FRIENDS */}
-      <div style={{ marginTop: 30 }}>
-
-        <h3>Add Friend</h3>
-
-        <input
-          type="email"
-          placeholder="Friend email"
-          value={friendEmail}
-          onChange={(e) => setFriendEmail(e.target.value)}
-        />
-
-        <button onClick={sendFriendRequest}>
-          Send Friend Request
-        </button>
-
-        {message && <p>{message}</p>}
-
-      </div>
- 
       {/* ACTION BUTTONS */}
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
         <button className="btn-primary" onClick={() => navigate('scanner')}>
@@ -221,7 +165,7 @@ export default function Home({ navigate }) {
           <span style={{ fontSize: 20, color: 'var(--muted)' }}>→</span>
         </button>
       </div>
- 
+
       {/* TODAY'S MEALS */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', marginBottom: 12 }}>
         <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 700 }}>Today's meals</span>
@@ -230,7 +174,7 @@ export default function Home({ navigate }) {
           + Add manually
         </button>
       </div>
- 
+
       <div style={{ padding: '0 20px', marginBottom: 60 }}>
         {meals.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
@@ -243,7 +187,7 @@ export default function Home({ navigate }) {
           ))
         )}
       </div>
- 
+
       {showModal && (
         <AddMealModal onClose={() => setShowModal(false)} onSaved={refresh} />
       )}

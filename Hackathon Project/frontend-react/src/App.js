@@ -4,7 +4,8 @@ import Login from './pages/Login'
 import Home from './pages/Home';
 import Scanner from './pages/Scanner';
 import Log from './pages/Log';
-import Ingredients from './pages/Ingredients';
+import Ingredients from './pages/Ingredients'
+import Goals from './pages/Goals';
 import Chat from './pages/Chat';
 
 export default function App() {
@@ -21,7 +22,8 @@ export default function App() {
       {page === 'home'        && <Home        navigate={navigate} />}
       {page === 'scanner'     && <Scanner     navigate={navigate} />}
       {page === 'ingredients' && <Ingredients navigate={navigate} />}
-      {page === 'log'         && <Log         navigate={navigate} />}
+      {page === 'log'     && <Log     navigate={navigate} />}
+      {page === 'goals'   && <Goals   navigate={navigate} />}
       {page === 'chat'        && <Chat        navigate={navigate} />}
     </div>
   );
