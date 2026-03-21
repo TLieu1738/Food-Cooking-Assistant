@@ -25,6 +25,7 @@ export default function Home({ navigate }) {
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'short', day: 'numeric', month: 'short'
   });
+  const name = localStorage.getItem('username') || localStorage.getItem('user_email')?.split('@')[0] || '';
  
   return (
     <div>
@@ -75,7 +76,7 @@ export default function Home({ navigate }) {
  
       {/* HERO */}
       <div style={{ padding: '28px 20px 16px' }}>
-        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>Good day</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>Good day{name ? `, ${name}` : ''}</div>
         <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 28, fontWeight: 800, lineHeight: 1.15 }}>
           Track your<br />
           <span style={{ color: 'var(--accent)' }}>nutrition & budget</span>

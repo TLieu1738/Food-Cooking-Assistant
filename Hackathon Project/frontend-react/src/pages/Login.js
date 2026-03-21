@@ -5,7 +5,9 @@ const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
 export default function Login({ navigate }) {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
+  const [identifier, setIdentifier] = useState(''); // email or username for signin
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,9 +20,20 @@ export default function Login({ navigate }) {
   }, [civicUser, navigate]);
 
   async function handleSubmit() {
-    if (!email.trim() || !password.trim()) {
-      setError('Please fill in all fields.');
-      return;
+    if (mode === 'signin') {
+      if (!identifier.trim() || !password.trim()) {
+        setError('Please fill in all fields.');
+        return;
+      }
+    } else {
+      if (!username.trim() || !email.trim() || !password.trim()) {
+        setError('Please fill in all fields.');
+        return;
+      }
+      if (!username.trim()) {
+        setError('Username is required.');
+        return;
+      }
     }
     if (password.length < 6) {
       setError('Password must be at least 6 characters.');
@@ -34,11 +47,13 @@ export default function Login({ navigate }) {
         const res = await fetch(`${BACKEND}/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ identifier, password })
         });
         const data = await res.json();
         if (data.access_token) {
           localStorage.setItem('token', data.access_token);
+          localStorage.setItem('user_email', data.email);
+          localStorage.setItem('username', data.username);
           navigate('home');
         } else {
           setError(data.error || 'Sign in failed.');
@@ -47,18 +62,20 @@ export default function Login({ navigate }) {
         const res = await fetch(`${BACKEND}/signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email, password, username })
         });
         const data = await res.json();
-        if (data.id || data.user_id) {
+        if (data.id) {
           const loginRes = await fetch(`${BACKEND}/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ identifier: email, password })
           });
           const loginData = await loginRes.json();
           if (loginData.access_token) {
             localStorage.setItem('token', loginData.access_token);
+            localStorage.setItem('user_email', loginData.email);
+            localStorage.setItem('username', loginData.username);
             navigate('home');
           } else {
             setMode('signin');
@@ -78,6 +95,9 @@ export default function Login({ navigate }) {
     setMode(mode === 'signin' ? 'signup' : 'signin');
     setError('');
     setPassword('');
+    setIdentifier('');
+    setUsername('');
+    setEmail('');
   }
 
   return (
@@ -115,18 +135,46 @@ export default function Login({ navigate }) {
         </div>
 
         {/* FIELDS */}
-        <div className="form-group">
-          <label className="form-label">Email</label>
-          <input
-            className="form-input"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            autoFocus
-          />
-        </div>
+        {mode === 'signin' ? (
+          <div className="form-group">
+            <label className="form-label">Email or Username</label>
+            <input
+              className="form-input"
+              type="text"
+              placeholder="you@example.com or Username"
+              value={identifier}
+              onChange={e => setIdentifier(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              autoFocus
+            />
+          </div>
+        ) : (
+          <>
+            <div className="form-group">
+              <label className="form-label">Username</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                autoFocus
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <input
+                className="form-input"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              />
+            </div>
+          </>
+        )}
         <div className="form-group">
           <label className="form-label">Password</label>
           <input

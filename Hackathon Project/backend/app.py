@@ -5,7 +5,7 @@ import os, json
 from datetime import date, datetime, timezone
 from dotenv import load_dotenv
 from coach import get_nutrition_advice
-from dbClient import supabase
+from dbClient import supabase, supabase_admin
 
 load_dotenv()
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -159,29 +159,67 @@ health_score is 1–10 (10 = extremely nutritious). Return 3 dishes ranked by ho
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.json
+    username = data.get("username", "").strip()
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+
+    if not username:
+        return jsonify({"error": "Username is required."}), 400
+
+    # Check username is unique
+    existing = supabase.table("profiles").select("id").eq("username", username).execute()
+    if existing.data:
+        return jsonify({"error": "Username already taken."}), 400
+
     try:
         response = supabase.auth.sign_up({
-            "email": data["email"],
-            "password": data["password"]
+            "email": email,
+            "password": password,
+            "options": {"data": {"display_name": username}}
         })
-        return jsonify(response.user.model_dump())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        user = response.user
+    except Exception:
+        return jsonify({"error": "Could not create account. That email may already be registered."}), 400
+
+    try:
+        supabase.table("profiles").insert({
+            "user_id": user.id,
+            "username": username,
+            "email": email,
+        }).execute()
+    except Exception:
+        if supabase_admin:
+            supabase_admin.auth.admin.delete_user(user.id)
+        return jsonify({"error": "Could not save username. Please try again."}), 500
+
+    return jsonify({"id": user.id, "username": username})
 
 @app.route("/login", methods=["POST"])
 def login():
     data = request.json
+    identifier = data.get("identifier", "").strip()
+    password = data.get("password", "")
+
+    # Resolve username to email if needed
+    email = identifier
+    if "@" not in identifier:
+        result = supabase.table("profiles").select("email").eq("username", identifier).execute()
+        if not result.data:
+            return jsonify({"error": "Username not found."}), 400
+        email = result.data[0]["email"]
+
     try:
-        response = supabase.auth.sign_in_with_password({
-            "email": data["email"],
-            "password": data["password"]
-        })
+        response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        # Fetch username for the response
+        profile = supabase.table("profiles").select("username").eq("email", email).execute()
+        username = profile.data[0]["username"] if profile.data else email.split("@")[0]
         return jsonify({
             "access_token": response.session.access_token,
-            "user": response.user.model_dump()
+            "username": username,
+            "email": email,
         })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+    except Exception:
+        return jsonify({"error": "Incorrect password."}), 400
 
 @app.route("/protected", methods=["GET"])
 def protected():
