@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useUser } from '@civic/auth/react';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
@@ -8,6 +9,13 @@ export default function Login({ navigate }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { user: civicUser, signIn: civicSignIn, isLoading: civicLoading } = useUser();
+
+  useEffect(() => {
+    if (civicUser) {
+      navigate('home');
+    }
+  }, [civicUser, navigate]);
 
   async function handleSubmit() {
     if (!email.trim() || !password.trim()) {
@@ -148,6 +156,39 @@ export default function Login({ navigate }) {
             ? <><span className="spinner" />{mode === 'signin' ? 'Signing in...' : 'Creating account...'}</>
             : mode === 'signin' ? 'Sign In' : 'Create Account'
           }
+        </button>
+
+        {/* DIVIDER */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0 0' }}>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>or</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+        </div>
+
+        {/* CIVIC BUTTON */}
+        <button
+          onClick={civicSignIn}
+          disabled={civicLoading}
+          style={{
+            width: '100%',
+            padding: '13px',
+            marginTop: 12,
+            background: 'transparent',
+            color: 'var(--text)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            fontFamily: 'Syne, sans-serif',
+            fontSize: 15,
+            fontWeight: 600,
+            cursor: civicLoading ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            opacity: civicLoading ? 0.6 : 1,
+          }}>
+          {civicLoading ? <span className="spinner" /> : '🔐'}
+          Continue with Civic
         </button>
       </div>
 

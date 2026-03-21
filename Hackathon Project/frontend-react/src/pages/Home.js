@@ -87,6 +87,13 @@ export default function Home({ navigate }) {
           </div>
           <span style={{ fontSize: 20, color: 'var(--muted)' }}>→</span>
         </button>
+        <button className="btn-secondary" onClick={() => navigate('chat')}>
+          <div>
+            <div>AI Chef</div>
+            <div className="btn-sub light">Ask about nutrition & recipes</div>
+          </div>
+          <span style={{ fontSize: 20, color: 'var(--muted)' }}>→</span>
+        </button>
       </div>
 
       {/* TODAY'S MEALS */}

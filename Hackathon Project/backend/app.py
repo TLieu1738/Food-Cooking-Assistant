@@ -10,6 +10,13 @@ from dbClient import supabase
 load_dotenv()
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
+def get_user_from_token(token):
+    try:
+        res = supabase.auth.get_user(token)
+        return res.user if res else None
+    except Exception:
+        return None
+
 app = Flask(__name__)
 CORS(app)
 
@@ -189,12 +196,38 @@ def protected():
 
     token = token.replace("Bearer ", "")
 
-    user = supabase.auth.get_user(token)
+    user = get_user_from_token(token)
 
     if not user:
         return {"error": "Invalid token"}, 401
 
     return {"message": "You are logged in!"}
+
+@app.route("/save-meal", methods=["POST"])
+def save_meal():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return jsonify({"error": "No token"}), 401
+
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Invalid token"}), 401
+
+    data = request.json
+    meal = {
+        "user_id": user.id,
+        "food_name": data.get("food_name", ""),
+        "calories": data.get("calories", 0),
+        "protein_g": data.get("protein_g", 0),
+        "carbs_g": data.get("carbs_g", 0),
+        "fat_g": data.get("fat_g", 0),
+        "cost": data.get("cost_gbp", 0),
+        "logged_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    supabase.table("meals").insert(meal).execute()
+    return jsonify({"success": True})
+
 
 @app.route("/log-meal", methods=["POST"])
 def log_meal():
@@ -202,13 +235,13 @@ def log_meal():
     if not token:
         return jsonify({"error": "No token"}), 401
 
-    user_response = supabase.auth.get_user(token)
-    if not user_response or not user_response.user:
+    user = get_user_from_token(token)
+    if not user:
         return jsonify({"error": "Invalid token"}), 401
 
     data = request.json
     meal = {
-        "user_id": user_response.user.id,
+        "user_id": user.id,
         "food_name": data.get("food_name", ""),
         "calories": data.get("calories", 0),
         "protein_g": data.get("protein_g", 0),
@@ -228,13 +261,13 @@ def get_meals():
     if not token:
         return jsonify({"error": "No token"}), 401
 
-    user_response = supabase.auth.get_user(token)
-    if not user_response or not user_response.user:
+    user = get_user_from_token(token)
+    if not user:
         return jsonify({"error": "Invalid token"}), 401
 
     today = date.today().isoformat()
     result = supabase.table("meals").select("*") \
-        .eq("user_id", user_response.user.id) \
+        .eq("user_id", user.id) \
         .gte("logged_at", today) \
         .order("logged_at") \
         .execute()
@@ -247,13 +280,13 @@ def delete_meal(meal_id):
     if not token:
         return jsonify({"error": "No token"}), 401
 
-    user_response = supabase.auth.get_user(token)
-    if not user_response or not user_response.user:
+    user = get_user_from_token(token)
+    if not user:
         return jsonify({"error": "Invalid token"}), 401
 
     supabase.table("meals").delete() \
         .eq("id", meal_id) \
-        .eq("user_id", user_response.user.id) \
+        .eq("user_id", user.id) \
         .execute()
     return jsonify({"ok": True})
 
@@ -321,6 +354,54 @@ def save_scan():
     except Exception as e:
         print(e)
         return jsonify({"error": str(e)}), 500
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.json
+    messages = data.get("messages", [])
+
+    if not messages:
+        return jsonify({"error": "no_messages"}), 400
+
+    # Build meal context for authenticated users
+    meal_context = ""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if token:
+        try:
+            chat_user = get_user_from_token(token)
+            if chat_user:
+                today = date.today().isoformat()
+                result = supabase.table("meals").select("*") \
+                    .eq("user_id", chat_user.id) \
+                    .gte("logged_at", today) \
+                    .order("logged_at") \
+                    .execute()
+                if result.data:
+                    meal_summary = ", ".join([
+                        f"{m['food_name']} ({m['calories']} kcal)"
+                        for m in result.data
+                    ])
+                    meal_context = f"\n\nThe user has logged these meals today: {meal_summary}."
+        except Exception:
+            pass
+
+    system_prompt = f"""You are NutriScan's AI Chef Assistant — a friendly, knowledgeable food and nutrition expert. You help users with:
+- Personalised nutrition advice and meal planning
+- Recipes and cooking techniques
+- Food budget optimisation (prices in GBP)
+- Health and dietary goals
+
+Be concise, practical, and conversational. Focus only on food, nutrition, cooking, and health topics.{meal_context}"""
+
+    response = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=1024,
+        system=system_prompt,
+        messages=messages
+    )
+
+    return jsonify({"reply": response.content[0].text})
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000) 
