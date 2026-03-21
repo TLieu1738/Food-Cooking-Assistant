@@ -1,10 +1,12 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import anthropic
 import os, json
 from datetime import date, datetime, timezone, timedelta
 from dotenv import load_dotenv
 from coach import get_nutrition_advice
+from dbClient import supabase
+
 from dbClient import supabase, supabase_admin
 
 load_dotenv()
@@ -325,6 +327,112 @@ def delete_meal(meal_id):
     return jsonify({"ok": True})
 
 
+@app.route("/friends/request", methods=["POST"])
+def send_friend_request():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    print("TOKEN RECEIVED:", token)
+    user = get_user_from_token(token)
+    print("USER:", user)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+ 
+    sender_id = user.id
+    data = request.json
+    identifier = data.get("email")
+ 
+    if not identifier:
+        return jsonify({"error": "email_required"}), 400
+ 
+    # Find receiver by email or username
+    receiver = supabase.table("profiles") \
+        .select("*") \
+        .or_(f"username.eq.{identifier},email.eq.{identifier}") \
+        .execute()
+ 
+    if not receiver.data:
+        return jsonify({"error": "user_not_found"}), 404
+ 
+    receiver_id = receiver.data[0]["user_id"]
+ 
+    if sender_id == receiver_id:
+        return jsonify({"error": "cannot_add_self"}), 400
+ 
+    # Check if already friends
+    already_friends = supabase.table("friends") \
+        .select("*") \
+        .eq("user_id", sender_id) \
+        .eq("friend_id", receiver_id) \
+        .execute()
+ 
+    if already_friends.data:
+        return jsonify({"error": "already_friends"}), 400
+ 
+    # Check if pending request already exists in either direction
+    existing = supabase.table("friend_requests") \
+        .select("*") \
+        .eq("status", "pending") \
+        .or_(
+            f"and(sender_id.eq.{sender_id},receiver_id.eq.{receiver_id}),"
+            f"and(sender_id.eq.{receiver_id},receiver_id.eq.{sender_id})"
+        ) \
+        .execute()
+ 
+    if existing.data:
+        return jsonify({"error": "request_already_exists"}), 400
+ 
+    supabase.table("friend_requests").insert({
+        "sender_id": sender_id,
+        "receiver_id": receiver_id,
+        "status": "pending"
+    }).execute()
+ 
+    return jsonify({"success": True}), 201
+ 
+ 
+@app.route("/friends/accept", methods=["POST"])
+def accept_friend_request():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+ 
+    current_user_id = user.id
+    data = request.json
+    request_id = data.get("request_id")
+ 
+    if not request_id:
+        return jsonify({"error": "request_id_required"}), 400
+ 
+    request_data = supabase.table("friend_requests") \
+        .select("*") \
+        .eq("id", request_id) \
+        .execute()
+ 
+    if not request_data.data:
+        return jsonify({"error": "not_found"}), 404
+ 
+    req = request_data.data[0]
+ 
+    # Make sure the current user is the receiver
+    if req["receiver_id"] != current_user_id:
+        return jsonify({"error": "unauthorized"}), 403
+ 
+    if req["status"] != "pending":
+        return jsonify({"error": "request_not_pending"}), 400
+ 
+    supabase.table("friend_requests") \
+        .update({"status": "accepted"}) \
+        .eq("id", request_id) \
+        .execute()
+ 
+    # Insert friendship both ways
+    supabase.table("friends").insert([
+        {"user_id": req["sender_id"], "friend_id": req["receiver_id"]},
+        {"user_id": req["receiver_id"], "friend_id": req["sender_id"]}
+    ]).execute()
+ 
+    return jsonify({"success": True}), 200
+
 #AI nutrition coach route
 @app.route("/nutrition-coach", methods=["POST"])
 def nutrition_coach():
@@ -388,94 +496,45 @@ def save_scan():
     except Exception as e:
         print(e)
         return jsonify({"error": str(e)}), 500
-    
-@app.route("/send-friend-request", methods=["POST"])
-def send_friend_request():
+
+
+@app.route("/goals", methods=["GET"])
+def get_goals():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    result = supabase.table("goals").select("*").eq("user_id", user.id).execute()
+    if result.data:
+        return jsonify(result.data[0])
+    return jsonify({"calories": 2000, "protein": 150, "budget": 50})
+
+
+@app.route("/goals", methods=["POST"])
+def save_goals():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
     data = request.json
-    sender_id = data.get("sender_id")
-    identifier = data.get("identifier")  # username or email
-
-    # Find user by username or email
-    user = supabase.table("profiles") \
-        .select("*") \
-        .or_(f"username.eq.{identifier},email.eq.{identifier}") \
-        .execute()
-
-    if not user.data:
-        return jsonify({"error": "user_not_found"}), 404
-
-    receiver_id = user.data[0]["id"]
-
-    # Prevent sending request to yourself
-    if sender_id == receiver_id:
-        return jsonify({"error": "cannot_add_self"}), 400
-
-    # Check if request already exists
-    existing = supabase.table("friend_requests") \
-        .select("*") \
-        .or_(f"sender_id.eq.{sender_id},receiver_id.eq.{receiver_id}") \
-        .execute()
+    existing = supabase.table("goals").select("id").eq("user_id", user.id).execute()
     if existing.data:
-        return jsonify({"error": "request_already_exists"}), 400
-
-    # Insert request
-    supabase.table("friend_requests").insert({
-        "sender_id": sender_id,
-        "receiver_id": receiver_id,
-        "status": "pending"
-    }).execute()
-
-    return jsonify({"success": True})
-
-@app.route("/accept-friend-request", methods=["POST"])
-def accept_friend_request():
-    data = request.json
-    request_id = data.get("request_id")
-
-    request_data = supabase.table("friend_requests") \
-        .select("*") \
-        .eq("id", request_id) \
-        .execute()
-    
-    if not request_data.data:
-        return jsonify({"error": "not_found"}), 404
-    
-    req = request_data.data[0]
-
-    # Update status to accepted
-    supabase.table("friend_requests") \
-        .update({"status": "accepted"}) \
-        .eq("id", request_id) \
-        .execute()
-
-    # Create friendship both ways
-    supabase.table("friends").insert([
-        {"user_id": req["sender_id"], "friend_id": req["receiver_id"]},
-        {"user_id": req["receiver_id"], "friend_id": req["sender_id"]}
-    ]).execute()
+        supabase.table("goals").update({
+            "calories": data.get("calories", 2000),
+            "protein": data.get("protein", 150),
+            "budget": data.get("budget", 50),
+        }).eq("user_id", user.id).execute()
+    else:
+        supabase.table("goals").insert({
+            "user_id": user.id,
+            "calories": data.get("calories", 2000),
+            "protein": data.get("protein", 150),
+            "budget": data.get("budget", 50),
+        }).execute()
 
     return jsonify({"success": True})
-
-@app.route("/friend-requests/<user_id>")
-def get_friend_requests(user_id):
-
-    requests = supabase.table("friend_requests") \
-        .select("*, profiles!friend_requests_sender_id_fkey(username,email)") \
-        .eq("receiver_id", user_id) \
-        .eq("status", "pending") \
-        .execute()
-
-    return jsonify(requests.data)
-
-@app.route("/friends/<user_id>")
-def get_friends(user_id):
-
-    friends = supabase.table("friends") \
-        .select("friend_id") \
-        .eq("user_id", user_id) \
-        .execute()
-
-    return jsonify(friends.data)
 
 
 @app.route("/chat", methods=["POST"])
@@ -514,7 +573,8 @@ def chat():
 - Food budget optimisation (prices in GBP)
 - Health and dietary goals
 
-Be concise, practical, and conversational. Focus only on food, nutrition, cooking, and health topics.{meal_context}"""
+Be concise, practical, and conversational. Focus only on food, nutrition, cooking, and health topics.
+Do NOT use markdown formatting — no headers, no bold, no bullet symbols like * or #. Use plain sentences and simple line breaks only.{meal_context}"""
 
     response = client.messages.create(
         model="claude-opus-4-6",
@@ -527,7 +587,8 @@ Be concise, practical, and conversational. Focus only on food, nutrition, cookin
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, host="0.0.0.0", port=port)
 
 # Add these routes to your existing app.py
 

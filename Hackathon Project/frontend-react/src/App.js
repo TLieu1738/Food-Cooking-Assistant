@@ -7,6 +7,7 @@ import Log from './pages/Log';
 import Ingredients from './pages/Ingredients'
 import Goals from './pages/Goals';
 import Chat from './pages/Chat';
+import Friends from './pages/Friends';
 
 export default function App() {
   const [page, setPage] = useState(localStorage.getItem('token') ? 'home' : 'login');
@@ -25,6 +26,7 @@ export default function App() {
       {page === 'log'     && <Log     navigate={navigate} />}
       {page === 'goals'   && <Goals   navigate={navigate} />}
       {page === 'chat'        && <Chat        navigate={navigate} />}
+      {page === 'friends'        && <Friends        navigate={navigate} />}
     </div>
   );
 }

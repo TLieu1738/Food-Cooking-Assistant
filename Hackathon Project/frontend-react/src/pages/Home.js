@@ -7,7 +7,6 @@ import { getTodaysMeals, deleteMeal, getTotals } from '../utils/storage';
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
 export default function Home({ navigate }) {
-  const token = localStorage.getItem('token');
   const [meals, setMeals] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -70,7 +69,8 @@ export default function Home({ navigate }) {
             { icon: '👤', label: 'Profile',  sub: 'Edit your details',           route: 'profile' },
             { icon: '🎯', label: 'Goals',    sub: 'Set calorie & macro targets',  route: 'goals' },
             { icon: '📅', label: 'History',  sub: 'Browse past meals',           route: 'history' },
-            { icon: '⚙️', label: 'Settings', sub: 'App preferences',             route: 'settings' },
+            { icon: '⚙️', label: 'Settings', sub: 'App preferences',           route: 'settings' },
+            { icon: '🫂', label: 'Friends', sub: 'Add friends',           route: 'friends' },
           ].map(({ icon, label, sub, route }) => (
             <button key={route} className="dropdown-item" onClick={() => { setMenuOpen(false); navigate(route); }}>
               <div className="item-icon">{icon}</div>
@@ -133,6 +133,7 @@ export default function Home({ navigate }) {
         </div>
         <CalorieBar current={totals.cal} goal={goals.calories} />
       </div>
+ 
 
       {/* ACTION BUTTONS */}
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>

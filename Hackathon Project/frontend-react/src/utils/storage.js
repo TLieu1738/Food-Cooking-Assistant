@@ -9,9 +9,14 @@ function authHeaders() {
 }
 
 function handleExpired(data) {
-  if (data.error && data.error.toLowerCase().includes('expired')) {
-    localStorage.removeItem('token');
-    window.location.reload();
+  if (data.error) {
+    const msg = data.error.toLowerCase();
+    if (msg.includes('expired') || msg.includes('invalid token') || msg.includes('unauthorized')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      localStorage.removeItem('user_email');
+      window.location.reload();
+    }
   }
 }
 
