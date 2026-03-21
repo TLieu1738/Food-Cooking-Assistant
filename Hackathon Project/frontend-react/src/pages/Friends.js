@@ -28,6 +28,7 @@ export default function Friends({ token }) {
     }
   }
 
+  // eslint-disable-next-line no-unused-vars
   async function acceptFriendRequest(requestId) {
     try {
       const res = await fetch(`${BACKEND}/friends/accept`, {

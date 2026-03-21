@@ -574,7 +574,8 @@ def chat():
 - Food budget optimisation (prices in GBP)
 - Health and dietary goals
 
-Be concise, practical, and conversational. Focus only on food, nutrition, cooking, and health topics.{meal_context}"""
+Be concise, practical, and conversational. Focus only on food, nutrition, cooking, and health topics.
+Do NOT use markdown formatting — no headers, no bold, no bullet symbols like * or #. Use plain sentences and simple line breaks only.{meal_context}"""
 
     response = client.messages.create(
         model="claude-opus-4-6",
