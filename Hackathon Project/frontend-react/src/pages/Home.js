@@ -8,6 +8,8 @@ export default function Home({ navigate }) {
   const [meals, setMeals] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [friendEmail, setFriendEmail] = useState("");
+  const [message, setMessage] = useState("");
  
   useEffect(() => { refresh(); }, []);
  
@@ -20,6 +22,60 @@ export default function Home({ navigate }) {
     await deleteMeal(id);
     refresh();
   }
+
+  async function sendFriendRequest() {
+    try {
+      const res = await fetch(`${BACKEND}/friends/request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          email: friendEmail
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage("Friend request sent ✅");
+        setFriendEmail("");
+      } else {
+        setMessage(data.error || "Failed to send request");
+      }
+
+    } catch (err) {
+      setMessage("Server error");
+    }
+  }
+
+  async function acceptFriendRequest(requestId) {
+    try {
+      const res = await fetch(`${BACKEND}/friends/accept`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          request_id: requestId
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage("Friend added 🎉");
+      } else {
+        setMessage(data.error || "Failed to accept");
+      }
+
+    } catch {
+      setMessage("Server error");
+    }
+  }
+
  
   const totals = getTotals(meals);
   const today = new Date().toLocaleDateString('en-GB', {
@@ -103,6 +159,26 @@ export default function Home({ navigate }) {
           ))}
         </div>
         <CalorieBar current={totals.cal} />
+      </div>
+
+      {/* FRIENDS */}
+      <div style={{ marginTop: 30 }}>
+
+        <h3>Add Friend</h3>
+
+        <input
+          type="email"
+          placeholder="Friend email"
+          value={friendEmail}
+          onChange={(e) => setFriendEmail(e.target.value)}
+        />
+
+        <button onClick={sendFriendRequest}>
+          Send Friend Request
+        </button>
+
+        {message && <p>{message}</p>}
+
       </div>
  
       {/* ACTION BUTTONS */}
