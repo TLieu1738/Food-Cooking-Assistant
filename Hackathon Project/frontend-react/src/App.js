@@ -25,6 +25,7 @@ export default function App() {
       {page === 'log'     && <Log     navigate={navigate} />}
       {page === 'goals'   && <Goals   navigate={navigate} />}
       {page === 'chat'        && <Chat        navigate={navigate} />}
+      {page === 'friends'        && <Friends        navigate={navigate} />}
     </div>
   );
 }
