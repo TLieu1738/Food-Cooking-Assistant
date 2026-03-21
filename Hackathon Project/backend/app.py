@@ -75,7 +75,23 @@ If it does contain food or drink, identify what it is and respond with ONLY vali
         }]
     )
     clean = response.content[0].text.strip().strip("```json").strip("```").strip()
-    return jsonify(json.loads(clean))
+
+    result = json.loads(clean)
+
+    #Save food scan
+    #scan_response = supabase.table("food_scans").insert({
+        #"food_name": result["food_name"],
+        #"calories": result["calories_per_serving"],
+        #"protein": result["macros"]["protein_g"],
+        #"carbs": result["macros"]["carbs_g"],
+        #"fat": result["macros"]["fat_g"]
+    #}).execute()
+
+    #Get scan_id
+    #scan_id = scan_response.data[0]["id"]
+    #result["scan_id"] = scan_id
+
+    return jsonify(result)
 
 @app.route("/from-ingredients", methods=["POST"])
 def from_ingredients():
@@ -248,13 +264,59 @@ def nutrition_coach():
     user_profile = data.get("user_profile")
     #recipe result
     food_data = data.get("food_data")
+    #scan_id 
+    scan_id = data.get("scan_id")
     
         
     if not user_profile or not food_data:
         return jsonify({"error": "missing_data"}), 400
-
+    
     advice = get_nutrition_advice(user_profile, food_data)
+
+    #Save nutrition coach data to database
+    #supabase.table("nutrition_advice").insert({
+        #"scan_id": scan_id,
+        #"health_score": advice["health_score"],
+        #"summary": advice["summary"],
+        #"good_points": advice["good_points"],
+        #"improvements": advice["improvements"],
+        #"next_meal_suggestion": advice["next_meal_suggestion"]
+    #}).execute()
+
     return jsonify(advice)
+
+@app.route("/save-meal", methods=["POST"])
+def save_scan():
+    try:
+        data = request.json
+
+        #insert food scan
+        scan = supabase.table("food_scans").insert({
+            "food_name": data["food_name"],
+            "calories": data["calories"],
+            "protein": data["protein_g"],
+            "carbs": data["carbs_g"],
+            "fat": data["fat_g"],
+            "cost": data["cost_per_serving_gbp"],
+        }).execute()
+
+        scan_id = scan.data[0]["id"]
+
+        #insert AI coach result
+        supabase.table("nutrition_advice").insert({
+            "scan_id": scan_id,
+            "health_score": data["advice"]["health_score"],
+            "summary": data["advice"]["summary"],
+            "good_points": data["advice"]["good_points"],
+            "improvements": data["advice"]["improvements"],
+            "next_meal_suggestion": data["advice"]["next_meal_suggestion"]
+        }).execute()
+
+        return jsonify({"success": True})
+    
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000) 

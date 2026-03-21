@@ -1,5 +1,6 @@
 import json
 from ai_client import client
+from dbClient import supabase
 
 def get_nutrition_advice(user_profile, food_data):
     """
@@ -44,6 +45,8 @@ Respond with ONLY valid JSON, no markdown or code fences:
         clean = text.strip()
 
         return json.loads(clean)
+    
+        
 
     except Exception as e:
         print(f"Nutrition coach error: {e}")
