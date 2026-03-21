@@ -29,10 +29,6 @@ def add_ngrok_header(response):
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, '..', 'frontend')
 
-#@app.route("/")
-#def serve_frontend():
- #   return send_from_directory(FRONTEND_DIR, 'index.html')
-
 @app.route("/recipes", methods=["POST"])
 def get_recipes():
     image_b64 = request.json.get("image")
