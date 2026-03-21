@@ -80,5 +80,46 @@ If it does contain food or drink, identify what it is and respond with ONLY vali
     clean = response.content[0].text.strip().strip("```json").strip("```").strip()
     return jsonify(json.loads(clean))
 
+@app.route("/signup", methods=["POST"])
+def signup():
+    data = request.json
+
+    response = supabase.auth.sign_up({
+        "email": data["email"],
+        "password": data["password"]
+    })
+
+    return jsonify(response.user.model_dump())
+
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.json
+
+    response = supabase.auth.sign_in_with_password({
+        "email": data["email"],
+        "password": data["password"]
+    })
+
+    return jsonify({
+        "access_token": response.session.access_token,
+        "user": response.user.model_dump()
+    })
+
+@app.route("/protected", methods=["GET"])
+def protected():
+    token = request.headers.get("Authorization")
+
+    if not token:
+        return {"error": "No token"}, 401
+
+    token = token.replace("Bearer ", "")
+
+    user = supabase.auth.get_user(token)
+
+    if not user:
+        return {"error": "Invalid token"}, 401
+
+    return {"message": "You are logged in!"}
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
