@@ -269,14 +269,14 @@ export default function Scanner({ navigate }) {
                 </div>
 
                 {/* Save */}
-                <div style={{ marginTop: 14}}>
+                <div style={{ marginTop: 14 }}>
                   <button
-                    onClick={saveToDatabase}
+                    onClick={saveScanToDatabase} // fixed
                     disabled={saving || saved}
                     style={{
                       width: "100%",
                       padding: 14,
-                      boderRadius: 12,
+                      borderRadius: 12, // fixed typo
                       border: 'none',
                       fontFamily: 'Syne, sans-serif',
                       fontWeight: 700,
@@ -288,21 +288,15 @@ export default function Scanner({ navigate }) {
                   >
                     {saved
                       ? '✅ Saved to recipes'
-                      :saving
+                      : saving
                         ? 'Saving...'
-                        : '💾Save to Saved Recipes'
+                        : '💾 Save to Saved Recipes'
                     }
-                    
                   </button>
-                    
-                
+                </div>
               </div>
-
-              
             )}
           </>
-
-
         )}
       </div>
     </div>
