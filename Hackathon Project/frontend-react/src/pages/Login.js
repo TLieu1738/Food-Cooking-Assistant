@@ -6,7 +6,7 @@ function Login({ navigate }) {
 
   const handleLogin = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:5000/login", {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,7 +61,7 @@ export function Signup({ navigate }) {
 
   const handleSignup = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:5000/signup", {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/signup`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -114,7 +114,7 @@ export async function callProtectedRoute() {
   }
 
   try {
-    const res = await fetch("http://127.0.0.1:5000/protected", {
+    const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/protected`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
