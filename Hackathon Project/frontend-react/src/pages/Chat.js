@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import useCivicUser from '../utils/useCivicUser';
+import AddToPlanModal from '../components/AddToPlanModal';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
@@ -14,6 +15,8 @@ export default function Chat({ navigate }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [goalToast, setGoalToast] = useState(false);
+  const [planMeal, setPlanMeal] = useState(null);
   const bottomRef = useRef(null);
   const { user: civicUser } = useCivicUser();
 
@@ -41,6 +44,11 @@ export default function Chat({ navigate }) {
         body: JSON.stringify({ messages: newMessages }),
       });
       const data = await res.json();
+      if (data.goal_updated && data.goal_values) {
+        localStorage.setItem('goals', JSON.stringify(data.goal_values));
+        setGoalToast(true);
+        setTimeout(() => setGoalToast(false), 3000);
+      }
       setMessages([...newMessages, { role: 'assistant', content: data.reply }]);
     } catch {
       setMessages([...newMessages, {
@@ -64,6 +72,19 @@ export default function Chat({ navigate }) {
           </div>
         )}
       </div>
+
+      {goalToast && (
+        <div style={{
+          position: 'fixed', top: 70, left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--accent)', color: '#0a0a0a',
+          borderRadius: 12, padding: '10px 18px',
+          fontSize: 13, fontWeight: 700, fontFamily: 'Syne, sans-serif',
+          zIndex: 999, boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          animation: 'fadeInDown 0.3s ease'
+        }}>
+          🎯 Goals updated!
+        </div>
+      )}
 
       {/* MESSAGES */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', paddingBottom: 100 }}>
@@ -102,32 +123,33 @@ export default function Chat({ navigate }) {
           </div>
         ) : (
           messages.map((msg, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex',
-                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                marginBottom: 12,
-              }}
-            >
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
               <div
                 style={{
                   maxWidth: '80%',
                   padding: '12px 16px',
-                  borderRadius: msg.role === 'user'
-                    ? '18px 18px 4px 18px'
-                    : '18px 18px 18px 4px',
+                  borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
                   background: msg.role === 'user' ? 'var(--accent)' : 'var(--surface)',
                   color: msg.role === 'user' ? '#0a0a0a' : 'var(--text)',
                   border: msg.role === 'user' ? 'none' : '1px solid var(--border)',
-                  fontSize: 14,
-                  lineHeight: 1.6,
-                  fontFamily: 'DM Sans, sans-serif',
-                  whiteSpace: 'pre-wrap',
+                  fontSize: 14, lineHeight: 1.6,
+                  fontFamily: 'DM Sans, sans-serif', whiteSpace: 'pre-wrap',
                 }}
               >
                 {msg.content}
               </div>
+              {msg.role === 'assistant' && (
+                <button
+                  onClick={() => setPlanMeal({ meal_name: '', source: 'ai_chat', description: msg.content })}
+                  style={{
+                    marginTop: 4, background: 'none', border: 'none',
+                    color: 'var(--muted)', fontSize: 12, cursor: 'pointer',
+                    fontFamily: 'DM Sans, sans-serif', padding: '2px 4px'
+                  }}
+                >
+                  📅 Save to Plan
+                </button>
+              )}
             </div>
           ))
         )}
@@ -218,10 +240,22 @@ export default function Chat({ navigate }) {
         </button>
       </div>
 
+      {planMeal && (
+        <AddToPlanModal
+          meal={planMeal}
+          onClose={() => setPlanMeal(null)}
+          onSaved={() => setPlanMeal(null)}
+        />
+      )}
+
       <style>{`
         @keyframes chatBounce {
           0%, 80%, 100% { transform: translateY(0); }
           40% { transform: translateY(-5px); }
+        }
+        @keyframes fadeInDown {
+          from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>
     </div>

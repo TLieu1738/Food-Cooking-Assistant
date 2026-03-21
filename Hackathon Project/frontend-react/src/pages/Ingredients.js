@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import AddToPlanModal from '../components/AddToPlanModal';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
 
@@ -9,6 +10,7 @@ export default function Ingredients({ navigate }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [expandedDish, setExpandedDish] = useState(null);
+  const [planMeal, setPlanMeal] = useState(null);
 
   useEffect(() => {
     initCamera();
@@ -225,12 +227,41 @@ export default function Ingredients({ navigate }) {
                       {dish.steps?.map((s, j) => <li key={j} style={{ marginBottom: 4 }}>{s}</li>)}
                     </ol>
                   )}
+
+                  <button
+                    onClick={() => setPlanMeal({
+                      meal_name: dish.name,
+                      calories: n.calories_per_serving,
+                      protein_g: n.protein_g,
+                      carbs_g: n.carbs_g,
+                      fat_g: n.fat_g,
+                      cost_gbp: dish.cost_gbp,
+                      source: 'ingredients',
+                      recipes: [{ name: dish.name, steps: dish.steps, time_minutes: dish.time_minutes, difficulty: dish.difficulty, cost_gbp: dish.cost_gbp }],
+                    })}
+                    style={{
+                      width: '100%', marginTop: 10, padding: '10px 14px',
+                      background: 'transparent', border: '1px solid var(--accent)',
+                      color: 'var(--accent)', borderRadius: 10,
+                      fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 600,
+                      cursor: 'pointer'
+                    }}>
+                    📅 Add to Meal Plan
+                  </button>
                 </div>
               );
             })}
           </>
         )}
       </div>
+
+      {planMeal && (
+        <AddToPlanModal
+          meal={planMeal}
+          onClose={() => setPlanMeal(null)}
+          onSaved={() => setPlanMeal(null)}
+        />
+      )}
     </div>
   );
 }

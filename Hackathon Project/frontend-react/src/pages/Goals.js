@@ -13,6 +13,13 @@ export default function Goals({ navigate }) {
 
   useEffect(() => {
     async function fetchGoals() {
+      const cached = localStorage.getItem('goals');
+      if (cached) {
+        const g = JSON.parse(cached);
+        setCalories(String(g.calories));
+        setProtein(String(g.protein));
+        setBudget(String(g.budget));
+      }
       try {
         const token = localStorage.getItem('token');
         const res = await fetch(`${BACKEND}/goals`, {
@@ -23,9 +30,10 @@ export default function Goals({ navigate }) {
           setCalories(String(data.calories));
           setProtein(String(data.protein));
           setBudget(String(data.budget));
+          localStorage.setItem('goals', JSON.stringify(data));
         }
       } catch {
-        // Use defaults if fetch fails
+        // Use cached/defaults if fetch fails
       }
       setLoading(false);
     }
@@ -57,6 +65,7 @@ export default function Goals({ navigate }) {
       if (data.error) {
         setError(data.error);
       } else {
+        localStorage.setItem('goals', JSON.stringify({ calories: parseInt(calories), protein: parseInt(protein), budget: parseFloat(budget) }));
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }

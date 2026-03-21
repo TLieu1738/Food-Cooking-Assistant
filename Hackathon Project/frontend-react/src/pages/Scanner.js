@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import AddToPlanModal from '../components/AddToPlanModal';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
 
@@ -18,6 +19,7 @@ export default function Scanner({ navigate }) {
   const [advice, setAdvice] = useState(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showPlanModal, setShowPlanModal] = useState(false);
 
   useEffect(() => {
     initCamera();
@@ -258,29 +260,31 @@ export default function Scanner({ navigate }) {
                 <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 700, marginBottom: 6, color: '#ff9a3c' }}>
                   ⚡ Improvements
                 </div>
-                <div style={{ marginTop: 14 }}>
-                <button
-                  onClick={saveToDatabase}
-                  disabled={saving || saved}
-                  style={{
-                    width: '100%',
-                    padding: 14,
-                    borderRadius: 12,
-                    border: 'none',
-                    fontFamily: 'Syne, sans-serif',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    background: saved ? 'rgba(200,240,74,0.2)' : 'var(--accent)',
-                    color: '#0a0a0a',
-                    cursor: saved ? 'default' : 'pointer'
-                  }}
-                >
-                  {saved
-                    ? '✓ Saved to Recipes'
-                    : saving
-                      ? 'Saving...'
-                      : '💾 Save to Saved Recipes'}
-                </button>
+                <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={saveToDatabase}
+                    disabled={saving || saved}
+                    style={{
+                      flex: 2, padding: 14, borderRadius: 12, border: 'none',
+                      fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 15,
+                      background: saved ? 'rgba(200,240,74,0.2)' : 'var(--accent)',
+                      color: '#0a0a0a', cursor: saved ? 'default' : 'pointer'
+                    }}
+                  >
+                    {saved ? '✓ Saved' : saving ? 'Saving...' : '💾 Save'}
+                  </button>
+                  <button
+                    onClick={() => setShowPlanModal(true)}
+                    disabled={!result}
+                    style={{
+                      flex: 1, padding: 14, borderRadius: 12,
+                      border: '1px solid var(--accent)', background: 'transparent',
+                      color: 'var(--accent)', fontFamily: 'Syne, sans-serif',
+                      fontWeight: 700, fontSize: 15, cursor: 'pointer'
+                    }}
+                  >
+                    📅 Plan
+                  </button>
                 </div>
                 <ul style={{ paddingLeft: 18, fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 12 }}>
                   {advice.improvements.map((p, i) => <li key={i}>{p}</li>)}
@@ -294,6 +298,23 @@ export default function Scanner({ navigate }) {
           </>
         )}
       </div>
+
+      {showPlanModal && result && (
+        <AddToPlanModal
+          meal={{
+            meal_name: result.food_name,
+            calories: result.calories_per_serving,
+            protein_g: result.macros?.protein_g,
+            carbs_g: result.macros?.carbs_g,
+            fat_g: result.macros?.fat_g,
+            cost_gbp: result.cost_per_serving_gbp,
+            recipes: result.recipes || null,
+            source: 'scanner',
+          }}
+          onClose={() => setShowPlanModal(false)}
+          onSaved={() => setShowPlanModal(false)}
+        />
+      )}
     </div>
   );
 }

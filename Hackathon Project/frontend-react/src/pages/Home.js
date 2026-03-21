@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import MealCard from '../components/MealCard';
-import AddMealModal from '../components/AddMealModal';
 import CalorieBar from '../components/CalorieBar';
-import { getTodaysMeals, deleteMeal, getTotals } from '../utils/storage';
+import { getTodaysMeals, getTotals } from '../utils/storage';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
 export default function Home({ navigate }) {
   const [meals, setMeals] = useState([]);
-  const [showModal, setShowModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [goals, setGoals] = useState({ calories: 2000, protein: 150, budget: 50 });
  
@@ -23,25 +20,23 @@ export default function Home({ navigate }) {
   }
 
   async function fetchGoals() {
+    const cached = localStorage.getItem('goals');
+    if (cached) setGoals(JSON.parse(cached));
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${BACKEND}/goals`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
-      if (!data.error) setGoals(data);
+      if (!data.error) {
+        setGoals(data);
+        localStorage.setItem('goals', JSON.stringify(data));
+      }
     } catch {
-      // Keep defaults
+      // Keep cached/defaults
     }
   }
 
-  async function handleDelete(id) {
-    await deleteMeal(id);
-    refresh();
-  }
-
-
- 
   const totals = getTotals(meals);
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'short', day: 'numeric', month: 'short'
@@ -70,7 +65,8 @@ export default function Home({ navigate }) {
             { icon: '🎯', label: 'Goals',    sub: 'Set calorie & macro targets',  route: 'goals' },
             { icon: '📅', label: 'History',  sub: 'Browse past meals',           route: 'history' },
             { icon: '⚙️', label: 'Settings', sub: 'App preferences',           route: 'settings' },
-            { icon: '🫂', label: 'Friends', sub: 'Add friends',           route: 'friends' },
+            { icon: '🫂', label: 'Friends',       sub: 'Add friends',              route: 'friends' },
+            { icon: '📅', label: 'Meal Planner',  sub: 'Plan your week',           route: 'planner' },
           ].map(({ icon, label, sub, route }) => (
             <button key={route} className="dropdown-item" onClick={() => { setMenuOpen(false); navigate(route); }}>
               <div className="item-icon">{icon}</div>
@@ -131,7 +127,11 @@ export default function Home({ navigate }) {
             </div>
           ))}
         </div>
-        <CalorieBar current={totals.cal} goal={goals.calories} />
+        <CalorieBar
+          current={totals.cal} goal={goals.calories}
+          protein={totals.protein} proteinGoal={goals.protein}
+          cost={totals.cost} budget={goals.budget}
+        />
       </div>
  
 
@@ -167,31 +167,6 @@ export default function Home({ navigate }) {
         </button>
       </div>
 
-      {/* TODAY'S MEALS */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', marginBottom: 12 }}>
-        <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 700 }}>Today's meals</span>
-        <button onClick={() => setShowModal(true)}
-          style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
-          + Add manually
-        </button>
-      </div>
-
-      <div style={{ padding: '0 20px', marginBottom: 60 }}>
-        {meals.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
-            <div style={{ fontSize: 36, marginBottom: 10 }}>🍽️</div>
-            <div style={{ fontSize: 14, lineHeight: 1.5 }}>No meals logged yet today.<br />Scan food or add manually.</div>
-          </div>
-        ) : (
-          [...meals].reverse().map(m => (
-            <MealCard key={m.id} meal={m} onDelete={handleDelete} />
-          ))
-        )}
-      </div>
-
-      {showModal && (
-        <AddMealModal onClose={() => setShowModal(false)} onSaved={refresh} />
-      )}
     </div>
   );
 }

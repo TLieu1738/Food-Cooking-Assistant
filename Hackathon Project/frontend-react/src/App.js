@@ -8,6 +8,7 @@ import Ingredients from './pages/Ingredients'
 import Goals from './pages/Goals';
 import Chat from './pages/Chat';
 import Friends from './pages/Friends';
+import MealPlanner from './pages/MealPlanner';
 
 export default function App() {
   const [page, setPage] = useState(localStorage.getItem('token') ? 'home' : 'login');
@@ -23,10 +24,12 @@ export default function App() {
       {page === 'home'        && <Home        navigate={navigate} />}
       {page === 'scanner'     && <Scanner     navigate={navigate} />}
       {page === 'ingredients' && <Ingredients navigate={navigate} />}
-      {page === 'log'     && <Log     navigate={navigate} />}
+      {page === 'log'         && <Log     navigate={navigate} />}
+      {page === 'history'     && <Log     navigate={navigate} />}
       {page === 'goals'   && <Goals   navigate={navigate} />}
       {page === 'chat'        && <Chat        navigate={navigate} />}
       {page === 'friends'        && <Friends        navigate={navigate} />}
+      {page === 'planner'        && <MealPlanner    navigate={navigate} />}
     </div>
   );
 }

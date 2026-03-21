@@ -261,8 +261,12 @@ def save_meal():
         "logged_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    supabase.table("meals").insert(meal).execute()
-    return jsonify({"success": True})
+    try:
+        supabase.table("meals").insert(meal).execute()
+        return jsonify({"success": True})
+    except Exception as e:
+        print("save_meal error:", e)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/log-meal", methods=["POST"])
@@ -462,39 +466,190 @@ def nutrition_coach():
 
     return jsonify(advice)
 
-@app.route("/save-meal", methods=["POST"])
-def save_scan():
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.json
+    messages = data.get("messages", [])
+
+    if not messages:
+        return jsonify({"error": "no_messages"}), 400
+
+    chat_user = None
+    meal_context = ""
+    goals_context = ""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if token:
+        try:
+            chat_user = get_user_from_token(token)
+            if chat_user:
+                today = date.today().isoformat()
+                result = supabase.table("meals").select("*") \
+                    .eq("user_id", chat_user.id) \
+                    .gte("logged_at", today) \
+                    .order("logged_at") \
+                    .execute()
+                if result.data:
+                    meal_summary = ", ".join([
+                        f"{m['food_name']} ({m['calories']} kcal)"
+                        for m in result.data
+                    ])
+                    meal_context = f"\n\nThe user has logged these meals today: {meal_summary}."
+                goals_result = supabase.table("goals").select("*").eq("user_id", chat_user.id).execute()
+                if goals_result.data:
+                    g = goals_result.data[0]
+                    goals_context = f"\n\nThe user's current goals: {g.get('calories', 2000)} kcal/day, {g.get('protein', 150)}g protein/day, £{g.get('budget', 50)} weekly budget."
+        except Exception:
+            pass
+
+    system_prompt = f"""You are NutriScan's AI Chef Assistant — a friendly, knowledgeable food and nutrition expert. You help users with:
+- Personalised nutrition advice and meal planning
+- Recipes and cooking techniques
+- Food budget optimisation (prices in GBP)
+- Health and dietary goals
+
+Be concise, practical, and conversational. Focus only on food, nutrition, cooking, and health topics.
+Do NOT use markdown formatting — no headers, no bold, no bullet symbols like * or #. Use plain sentences and simple line breaks only.
+When you update goals, confirm exactly what was set in a short, friendly sentence.{meal_context}{goals_context}"""
+
+    tools = [
+        {
+            "name": "set_goals",
+            "description": "Update the user's nutrition and budget goals in the app. Call this when the user asks to set, change, or update their calorie, protein, or budget goals. Only include fields the user mentioned.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "calories": {"type": "integer", "description": "Daily calorie goal in kcal"},
+                    "protein": {"type": "integer", "description": "Daily protein goal in grams"},
+                    "budget": {"type": "number", "description": "Weekly food budget in GBP"}
+                }
+            }
+        }
+    ]
+
+    response = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=1024,
+        system=system_prompt,
+        tools=tools,
+        messages=messages
+    )
+
+    goal_updated = False
+    print("stop_reason:", response.stop_reason)
+
+    if response.stop_reason == "tool_use":
+        tool_block = next((b for b in response.content if b.type == "tool_use"), None)
+        if tool_block and tool_block.name == "set_goals" and chat_user:
+            tool_input = tool_block.input
+            print("set_goals called with:", tool_input)
+            tool_result = "Goals updated successfully."
+            try:
+                existing = supabase.table("goals").select("id").eq("user_id", chat_user.id).execute()
+                # Get current values to merge (only override what the user mentioned)
+                current_res = supabase.table("goals").select("*").eq("user_id", chat_user.id).execute()
+                current = current_res.data[0] if current_res.data else {"calories": 2000, "protein": 150, "budget": 50}
+                new_goals = {
+                    "calories": int(tool_input.get("calories", current.get("calories", 2000))),
+                    "protein": int(tool_input.get("protein", current.get("protein", 150))),
+                    "budget": float(tool_input.get("budget", current.get("budget", 50))),
+                }
+                if existing.data:
+                    res = supabase.table("goals").update(new_goals).eq("user_id", chat_user.id).execute()
+                    print("update result:", res.data)
+                else:
+                    new_goals["user_id"] = chat_user.id
+                    res = supabase.table("goals").insert(new_goals).execute()
+                    print("insert result:", res.data)
+                goal_updated = True
+            except Exception as e:
+                print("set_goals tool error:", e)
+                tool_result = f"Failed to update goals: {str(e)}"
+
+            # Serialize assistant content blocks for the follow-up call
+            assistant_content = []
+            for b in response.content:
+                if b.type == "text":
+                    assistant_content.append({"type": "text", "text": b.text})
+                elif b.type == "tool_use":
+                    assistant_content.append({"type": "tool_use", "id": b.id, "name": b.name, "input": b.input})
+
+            continued = messages + [
+                {"role": "assistant", "content": assistant_content},
+                {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool_block.id, "content": tool_result}]}
+            ]
+            final = client.messages.create(
+                model="claude-opus-4-6",
+                max_tokens=512,
+                system=system_prompt,
+                tools=tools,
+                messages=continued
+            )
+            reply_text = "".join(b.text for b in final.content if hasattr(b, "text"))
+            return jsonify({"reply": reply_text, "goal_updated": goal_updated, "goal_values": new_goals})
+
+    reply_text = "".join(b.text for b in response.content if hasattr(b, "text"))
+    return jsonify({"reply": reply_text, "goal_updated": False})
+
+
+@app.route("/meal-plan", methods=["GET"])
+def get_meal_plan():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    result = supabase.table("meal_plan").select("*") \
+        .eq("user_id", user.id) \
+        .gte("scheduled_for", date.today().isoformat()) \
+        .order("scheduled_for") \
+        .execute()
+    return jsonify(result.data)
+
+
+@app.route("/meal-plan", methods=["POST"])
+def add_meal_plan():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.json
+    entry = {
+        "user_id": user.id,
+        "meal_name": data.get("meal_name", ""),
+        "scheduled_for": data.get("scheduled_for", date.today().isoformat()),
+        "source": data.get("source", "manual"),
+        "calories": data.get("calories"),
+        "protein_g": data.get("protein_g"),
+        "carbs_g": data.get("carbs_g"),
+        "fat_g": data.get("fat_g"),
+        "cost_gbp": data.get("cost_gbp"),
+        "description": data.get("description"),
+        "recipes": data.get("recipes"),
+    }
     try:
-        data = request.json
-
-        #insert food scan
-        scan = supabase.table("food_scans").insert({
-            "food_name": data["food_name"],
-            "calories": data["calories"],
-            "protein": data["protein_g"],
-            "carbs": data["carbs_g"],
-            "fat": data["fat_g"],
-            "cost": data["cost_per_serving_gbp"],
-        }).execute()
-
-        scan_id = scan.data[0]["id"]
-
-        #insert AI coach result
-        supabase.table("nutrition_advice").insert({
-            "scan_id": scan_id,
-            "health_score": data["advice"]["health_score"],
-            "summary": data["advice"]["summary"],
-            "good_points": data["advice"]["good_points"],
-            "improvements": data["advice"]["improvements"],
-            "next_meal_suggestion": data["advice"]["next_meal_suggestion"]
-        }).execute()
-
-        return jsonify({"success": True})
-    
+        result = supabase.table("meal_plan").insert(entry).execute()
+        return jsonify({"success": True, "id": result.data[0]["id"]})
     except Exception as e:
-        print(e)
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/meal-plan/<entry_id>", methods=["DELETE"])
+def delete_meal_plan(entry_id):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    supabase.table("meal_plan").delete() \
+        .eq("id", entry_id) \
+        .eq("user_id", user.id) \
+        .execute()
+    return jsonify({"ok": True})
+
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)
+
+# Add these routes to your existing app.py
 
 @app.route("/goals", methods=["GET"])
 def get_goals():
@@ -517,114 +672,21 @@ def save_goals():
         return jsonify({"error": "Unauthorized"}), 401
 
     data = request.json
-    existing = supabase.table("goals").select("id").eq("user_id", user.id).execute()
-    if existing.data:
-        supabase.table("goals").update({
-            "calories": data.get("calories", 2000),
-            "protein": data.get("protein", 150),
-            "budget": data.get("budget", 50),
-        }).eq("user_id", user.id).execute()
-    else:
-        supabase.table("goals").insert({
-            "user_id": user.id,
-            "calories": data.get("calories", 2000),
-            "protein": data.get("protein", 150),
-            "budget": data.get("budget", 50),
-        }).execute()
-
-    return jsonify({"success": True})
-
-
-@app.route("/chat", methods=["POST"])
-def chat():
-    data = request.json
-    messages = data.get("messages", [])
-
-    if not messages:
-        return jsonify({"error": "no_messages"}), 400
-
-    # Build meal context for authenticated users
-    meal_context = ""
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    if token:
-        try:
-            chat_user = get_user_from_token(token)
-            if chat_user:
-                today = date.today().isoformat()
-                result = supabase.table("meals").select("*") \
-                    .eq("user_id", chat_user.id) \
-                    .gte("logged_at", today) \
-                    .order("logged_at") \
-                    .execute()
-                if result.data:
-                    meal_summary = ", ".join([
-                        f"{m['food_name']} ({m['calories']} kcal)"
-                        for m in result.data
-                    ])
-                    meal_context = f"\n\nThe user has logged these meals today: {meal_summary}."
-        except Exception:
-            pass
-
-    system_prompt = f"""You are NutriScan's AI Chef Assistant — a friendly, knowledgeable food and nutrition expert. You help users with:
-- Personalised nutrition advice and meal planning
-- Recipes and cooking techniques
-- Food budget optimisation (prices in GBP)
-- Health and dietary goals
-
-Be concise, practical, and conversational. Focus only on food, nutrition, cooking, and health topics.
-Do NOT use markdown formatting — no headers, no bold, no bullet symbols like * or #. Use plain sentences and simple line breaks only.{meal_context}"""
-
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=1024,
-        system=system_prompt,
-        messages=messages
-    )
-
-    return jsonify({"reply": response.content[0].text})
-
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
-
-# Add these routes to your existing app.py
-
-@app.route("/goals", methods=["GET"])
-def get_goals():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    if not token:
-        return jsonify({"error": "No token"}), 401
     try:
-        user = supabase.auth.get_user(token)
-        user_id = user.user.id
-        result = supabase.table("goals").select("*").eq("user_id", user_id).single().execute()
-        if result.data:
-            return jsonify(result.data)
-        # No goals set yet — return defaults
-        return jsonify({ "calories": 2000, "protein": 150, "budget": 50.00 })
-    except Exception as e:
-        return jsonify({ "calories": 2000, "protein": 150, "budget": 50.00 })
-
-
-@app.route("/goals", methods=["POST"])
-def save_goals():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    if not token:
-        return jsonify({"error": "No token"}), 401
-    try:
-        user = supabase.auth.get_user(token)
-        user_id = user.user.id
-        data = request.json
-        payload = {
-            "user_id": user_id,
-            "calories": int(data.get("calories", 2000)),
-            "protein": int(data.get("protein", 150)),
-            "budget": float(data.get("budget", 50.00)),
-            "updated_at": "now()"
-        }
-        # Upsert — insert if no row, update if one exists
-        result = supabase.table("goals").upsert(payload, on_conflict="user_id").execute()
-        return jsonify(result.data[0])
+        existing = supabase.table("goals").select("id").eq("user_id", user.id).execute()
+        if existing.data:
+            supabase.table("goals").update({
+                "calories": int(data.get("calories", 2000)),
+                "protein": int(data.get("protein", 150)),
+                "budget": float(data.get("budget", 50)),
+            }).eq("user_id", user.id).execute()
+        else:
+            supabase.table("goals").insert({
+                "user_id": user.id,
+                "calories": int(data.get("calories", 2000)),
+                "protein": int(data.get("protein", 150)),
+                "budget": float(data.get("budget", 50)),
+            }).execute()
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
