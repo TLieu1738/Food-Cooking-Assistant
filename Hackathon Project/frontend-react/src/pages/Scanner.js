@@ -75,7 +75,7 @@ export default function Scanner({ navigate }) {
       const coachRes = await fetch(`${BACKEND}/nutrition-coach`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-        body: JSON.stringify({ user_profile: userProfile, food_data: data, scan_id: data.scan_id })
+        body: JSON.stringify({ user_profile: userProfile, food_data: data })
       });
       const coachData = await coachRes.json();
       setAdvice(coachData);
@@ -87,44 +87,10 @@ export default function Scanner({ navigate }) {
     setLoading(false);
   }
 
-  async function saveScanToDatabase() {
-    if (!result || !advice) return;
-
-    setSaving(true);
-
-    try {
-      const res = await fetch(`${BACKEND}/save-meal`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true"
-        },
-        body: JSON.stringify({
-          food_name: result.food_name,
-          calories: result.calories_per_serving,
-          protein_g: result.macros.protein_g,
-          carbs_g: result.macros.carbs_g,
-          fat_g: result.macros.fat_g,
-          cost: result.cost_per_serving_gbp,
-          advice: advice
-        })
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        setSaved(true);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-
-    setSaving(false);
-  }
-
-  function addToLog() {
+  async function addToLog() {
     if (!result) return;
-    saveMeal({
+    setSaving(true);
+    await saveMeal({
       food_name: result.food_name,
       calories: result.calories_per_serving,
       protein_g: result.macros.protein_g,
@@ -132,7 +98,9 @@ export default function Scanner({ navigate }) {
       fat_g: result.macros.fat_g,
       cost: result.cost_per_serving_gbp
     });
+    setSaving(false);
     setAddedToLog(true);
+    setSaved(true);
   }
 
   return (
@@ -200,7 +168,7 @@ export default function Scanner({ navigate }) {
               </div>
               <button
                 onClick={addToLog}
-                disabled={addedToLog}
+                disabled={addedToLog || saving}
                 style={{
                   width: '100%', padding: 13,
                   background: addedToLog ? 'rgba(200,240,74,0.15)' : 'transparent',
@@ -210,7 +178,7 @@ export default function Scanner({ navigate }) {
                   fontFamily: 'Syne, sans-serif', fontSize: 15, fontWeight: 600,
                   cursor: addedToLog ? 'default' : 'pointer'
                 }}>
-                {addedToLog ? '✓ Added to log!' : '+ Add to today\'s meal log'}
+                {saving ? <><span className="spinner" />Saving...</> : addedToLog ? '✓ Added to log!' : '+ Add to today\'s meal log'}
               </button>
             </div>
 
@@ -234,7 +202,6 @@ export default function Scanner({ navigate }) {
                   🤖 AI Nutrition Coach
                 </div>
 
-                {/* Health Score */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                   <div style={{
                     background: 'var(--accent)', color: '#0a0a0a',
@@ -246,7 +213,6 @@ export default function Scanner({ navigate }) {
                   <div style={{ fontSize: 13, color: 'var(--muted)' }}>{advice.summary}</div>
                 </div>
 
-                {/* Good Points */}
                 <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 700, marginBottom: 6, color: 'var(--accent)' }}>
                   ✅ Good Points
                 </div>
@@ -254,7 +220,6 @@ export default function Scanner({ navigate }) {
                   {advice.good_points.map((p, i) => <li key={i}>{p}</li>)}
                 </ul>
 
-                {/* Improvements */}
                 <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 700, marginBottom: 6, color: '#ff9a3c' }}>
                   ⚡ Improvements
                 </div>
@@ -262,47 +227,13 @@ export default function Scanner({ navigate }) {
                   {advice.improvements.map((p, i) => <li key={i}>{p}</li>)}
                 </ul>
 
-                {/* Next Meal */}
                 <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 12, fontSize: 13 }}>
                   <span style={{ fontWeight: 700 }}>🍽 Next meal: </span>
                   <span style={{ color: 'var(--muted)' }}>{advice.next_meal_suggestion}</span>
                 </div>
-
-                {/* Save */}
-                <div style={{ marginTop: 14}}>
-                  <button
-                    onClick={saveToDatabase}
-                    disabled={saving || saved}
-                    style={{
-                      width: "100%",
-                      padding: 14,
-                      boderRadius: 12,
-                      border: 'none',
-                      fontFamily: 'Syne, sans-serif',
-                      fontWeight: 700,
-                      fontSize: 15,
-                      background: saved ? 'rgba(200,240,74,0.2)' : 'var(--accent)',
-                      color: '#0a0a0a',
-                      cursor: saved ? 'default' : 'pointer'
-                    }}
-                  >
-                    {saved
-                      ? '✅ Saved to recipes'
-                      :saving
-                        ? 'Saving...'
-                        : '💾Save to Saved Recipes'
-                    }
-                    
-                  </button>
-                    
-                
               </div>
-
-              
             )}
           </>
-
-
         )}
       </div>
     </div>

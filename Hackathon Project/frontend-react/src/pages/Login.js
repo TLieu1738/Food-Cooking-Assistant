@@ -43,9 +43,19 @@ export default function Login({ navigate }) {
         });
         const data = await res.json();
         if (data.id || data.user_id) {
-          setMode('signin');
-          setError('');
-          setPassword('');
+          const loginRes = await fetch(`${BACKEND}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+          const loginData = await loginRes.json();
+          if (loginData.access_token) {
+            localStorage.setItem('token', loginData.access_token);
+            navigate('home');
+          } else {
+            setMode('signin');
+            setError('Account created — please sign in.');
+          }
         } else {
           setError(data.error || 'Sign up failed.');
         }
