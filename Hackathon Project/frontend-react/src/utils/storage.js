@@ -8,10 +8,20 @@ function authHeaders() {
   };
 }
 
+function handleExpired(data) {
+  if (data.error && data.error.toLowerCase().includes('expired')) {
+    localStorage.removeItem('token');
+    window.location.reload();
+  }
+}
+
 export async function getTodaysMeals() {
   const res = await fetch(`${BACKEND}/get-meals`, { headers: authHeaders() });
   const data = await res.json();
-  if (data.error) return [];
+  if (data.error) {
+    handleExpired(data);
+    return [];
+  }
   return data.map(m => ({
     ...m,
     timestamp: m.logged_at
