@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import anthropic
 import os, json
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from dotenv import load_dotenv
 from coach import get_nutrition_advice
 from dbClient import supabase
@@ -140,27 +140,29 @@ health_score is 1–10 (10 = extremely nutritious). Return 3 dishes ranked by ho
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.json
-
-    response = supabase.auth.sign_up({
-        "email": data["email"],
-        "password": data["password"]
-    })
-
-    return jsonify(response.user.model_dump())
+    try:
+        response = supabase.auth.sign_up({
+            "email": data["email"],
+            "password": data["password"]
+        })
+        return jsonify(response.user.model_dump())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 @app.route("/login", methods=["POST"])
 def login():
     data = request.json
-
-    response = supabase.auth.sign_in_with_password({
-        "email": data["email"],
-        "password": data["password"]
-    })
-
-    return jsonify({
-        "access_token": response.session.access_token,
-        "user": response.user.model_dump()
-    })
+    try:
+        response = supabase.auth.sign_in_with_password({
+            "email": data["email"],
+            "password": data["password"]
+        })
+        return jsonify({
+            "access_token": response.session.access_token,
+            "user": response.user.model_dump()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 @app.route("/protected", methods=["GET"])
 def protected():
@@ -197,7 +199,7 @@ def log_meal():
         "carbs_g": data.get("carbs_g", 0),
         "fat_g": data.get("fat_g", 0),
         "cost": data.get("cost", 0),
-        "logged_at": data.get("timestamp", datetime.utcnow().isoformat()),
+        "logged_at": data.get("timestamp", datetime.now(timezone.utc).isoformat()),
     }
 
     result = supabase.table("meals").insert(meal).execute()
