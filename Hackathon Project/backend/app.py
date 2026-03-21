@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import anthropic
 import os, json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from dotenv import load_dotenv
 from coach import get_nutrition_advice
 from dbClient import supabase, supabase_admin
@@ -567,5 +567,50 @@ def save_goals():
         # Upsert — insert if no row, update if one exists
         result = supabase.table("goals").upsert(payload, on_conflict="user_id").execute()
         return jsonify(result.data[0])
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+# Add this route to your existing app.py
+
+@app.route("/meals/week", methods=["GET"])
+def get_week_meals():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return jsonify({"error": "No token"}), 401
+    try:
+        user = supabase.auth.get_user(token)
+        user_id = user.user.id
+
+        # Get start of current week (Monday) in UTC
+        today = datetime.now(timezone.utc)
+        days_since_monday = today.weekday()  # 0 = Monday
+        monday = today.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days_since_monday)
+
+        result = supabase.table("meals") \
+            .select("calories, protein_g, carbs_g, fat_g, cost, logged_at") \
+            .eq("user_id", user_id) \
+            .gte("logged_at", monday.isoformat()) \
+            .order("logged_at") \
+            .execute()
+
+        # Group by day of week (0=Mon ... 6=Sun)
+        days = {i: {"calories": 0, "protein": 0} for i in range(7)}
+        for meal in result.data:
+            logged = datetime.fromisoformat(meal["logged_at"].replace("Z", "+00:00"))
+            day_index = logged.weekday()  # 0=Mon, 6=Sun
+            days[day_index]["calories"] += meal.get("calories") or 0
+            days[day_index]["protein"]  += meal.get("protein_g") or 0
+
+        # Format as list Mon–Sun
+        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        response = [
+            {
+                "day": day_names[i],
+                "calories": round(days[i]["calories"]),
+                "protein": round(days[i]["protein"])
+            }
+            for i in range(7)
+        ]
+        return jsonify(response)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
