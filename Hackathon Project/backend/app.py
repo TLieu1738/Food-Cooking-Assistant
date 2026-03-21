@@ -6,7 +6,6 @@ from datetime import date, datetime, timezone
 from dotenv import load_dotenv
 from coach import get_nutrition_advice
 from dbClient import supabase
-from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 
 from dbClient import supabase, supabase_admin
 
@@ -21,8 +20,6 @@ def get_user_from_token(token):
         return None
 
 app = Flask(__name__)
-app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "your-secret-key")
-jwt = JWTManager(app)
 CORS(app)
 
 
@@ -353,7 +350,7 @@ def send_friend_request():
     if not receiver.data:
         return jsonify({"error": "user_not_found"}), 404
  
-    receiver_id = receiver.data[0]["id"]
+    receiver_id = receiver.data[0]["user_id"]
  
     if sender_id == receiver_id:
         return jsonify({"error": "cannot_add_self"}), 400
