@@ -330,7 +330,9 @@ def delete_meal(meal_id):
 @app.route("/friends/request", methods=["POST"])
 def send_friend_request():
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    print("TOKEN RECEIVED:", token)
     user = get_user_from_token(token)
+    print("USER:", user)
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
  
