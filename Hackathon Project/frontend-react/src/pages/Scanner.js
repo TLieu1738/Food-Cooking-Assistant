@@ -19,7 +19,6 @@ export default function Scanner({ navigate }) {
   const [advice, setAdvice] = useState(null);
   const [addedToLog, setAddedToLog] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     initCamera();
@@ -45,7 +44,6 @@ export default function Scanner({ navigate }) {
     setResult(null);
     setAdvice(null);
     setAddedToLog(false);
-    setSaved(false);
     setStatus('Analysing with Claude Vision...');
 
     const video = videoRef.current;
@@ -100,7 +98,6 @@ export default function Scanner({ navigate }) {
     });
     setSaving(false);
     setAddedToLog(true);
-    setSaved(true);
   }
 
   return (
@@ -201,7 +198,6 @@ export default function Scanner({ navigate }) {
                 <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 800, marginBottom: 12 }}>
                   🤖 AI Nutrition Coach
                 </div>
-
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                   <div style={{
                     background: 'var(--accent)', color: '#0a0a0a',
@@ -212,21 +208,18 @@ export default function Scanner({ navigate }) {
                   </div>
                   <div style={{ fontSize: 13, color: 'var(--muted)' }}>{advice.summary}</div>
                 </div>
-
                 <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 700, marginBottom: 6, color: 'var(--accent)' }}>
                   ✅ Good Points
                 </div>
                 <ul style={{ paddingLeft: 18, fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 12 }}>
                   {advice.good_points.map((p, i) => <li key={i}>{p}</li>)}
                 </ul>
-
                 <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 700, marginBottom: 6, color: '#ff9a3c' }}>
                   ⚡ Improvements
                 </div>
                 <ul style={{ paddingLeft: 18, fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 12 }}>
                   {advice.improvements.map((p, i) => <li key={i}>{p}</li>)}
                 </ul>
-
                 <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: 12, fontSize: 13 }}>
                   <span style={{ fontWeight: 700 }}>🍽 Next meal: </span>
                   <span style={{ color: 'var(--muted)' }}>{advice.next_meal_suggestion}</span>
