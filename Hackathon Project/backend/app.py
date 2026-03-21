@@ -4,6 +4,7 @@ import anthropic
 import os, json
 from dotenv import load_dotenv
 from coach import get_nutrition_advice
+from dbClient import supabase
 
 load_dotenv()
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
