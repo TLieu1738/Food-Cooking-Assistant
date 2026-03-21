@@ -3,36 +3,76 @@ import MealCard from '../components/MealCard';
 import AddMealModal from '../components/AddMealModal';
 import CalorieBar from '../components/CalorieBar';
 import { getTodaysMeals, deleteMeal, getTotals } from '../utils/storage';
-
+ 
 export default function Home({ navigate }) {
   const [meals, setMeals] = useState([]);
   const [showModal, setShowModal] = useState(false);
-
+  const [menuOpen, setMenuOpen] = useState(false);
+ 
   useEffect(() => { refresh(); }, []);
-
+ 
   async function refresh() {
     const data = await getTodaysMeals();
     setMeals(data);
   }
-
+ 
   async function handleDelete(id) {
     await deleteMeal(id);
     refresh();
   }
-
+ 
   const totals = getTotals(meals);
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'short', day: 'numeric', month: 'short'
   });
-
+ 
   return (
     <div>
       {/* NAV */}
-      <div className="nav">
+      <div className="nav" style={{ position: 'relative' }}>
         <span className="nav-logo">NutriScan</span>
-        <span style={{ fontSize: 13, color: 'var(--muted)' }}>{today}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 13, color: 'var(--muted)' }}>{today}</span>
+          <button
+            className={`menu-btn ${menuOpen ? 'open' : ''}`}
+            onClick={() => setMenuOpen(o => !o)}
+          >
+            <span /><span /><span />
+          </button>
+        </div>
+ 
+        <div className={`dropdown ${menuOpen ? 'open' : ''}`}>
+          {[
+            { icon: '👤', label: 'Profile',  sub: 'Edit your details',           route: 'profile' },
+            { icon: '🎯', label: 'Goals',    sub: 'Set calorie & macro targets',  route: 'goals' },
+            { icon: '📅', label: 'History',  sub: 'Browse past meals',           route: 'history' },
+            { icon: '⚙️', label: 'Settings', sub: 'App preferences',             route: 'settings' },
+          ].map(({ icon, label, sub, route }) => (
+            <button key={route} className="dropdown-item" onClick={() => { setMenuOpen(false); navigate(route); }}>
+              <div className="item-icon">{icon}</div>
+              <div>
+                <div className="item-label">{label}</div>
+                <div className="item-sub">{sub}</div>
+              </div>
+            </button>
+          ))}
+          <button className="dropdown-item danger" onClick={() => { setMenuOpen(false); /* your sign out logic */ }}>
+            <div className="item-icon">🚪</div>
+            <div>
+              <div className="item-label">Sign Out</div>
+              <div className="item-sub">Log out of NutriScan</div>
+            </div>
+          </button>
+        </div>
+ 
+        {menuOpen && (
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 250 }}
+            onClick={() => setMenuOpen(false)}
+          />
+        )}
       </div>
-
+ 
       {/* HERO */}
       <div style={{ padding: '28px 20px 16px' }}>
         <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>Good day</div>
@@ -41,7 +81,7 @@ export default function Home({ navigate }) {
           <span style={{ color: 'var(--accent)' }}>nutrition & budget</span>
         </div>
       </div>
-
+ 
       {/* SUMMARY CARD */}
       <div style={{ margin: '0 20px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 20, padding: 20 }}>
         <div style={{ fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 14 }}>
@@ -63,7 +103,7 @@ export default function Home({ navigate }) {
         </div>
         <CalorieBar current={totals.cal} />
       </div>
-
+ 
       {/* ACTION BUTTONS */}
       <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
         <button className="btn-primary" onClick={() => navigate('scanner')}>
@@ -88,7 +128,7 @@ export default function Home({ navigate }) {
           <span style={{ fontSize: 20, color: 'var(--muted)' }}>→</span>
         </button>
       </div>
-
+ 
       {/* TODAY'S MEALS */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', marginBottom: 12 }}>
         <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 700 }}>Today's meals</span>
@@ -97,7 +137,7 @@ export default function Home({ navigate }) {
           + Add manually
         </button>
       </div>
-
+ 
       <div style={{ padding: '0 20px', marginBottom: 60 }}>
         {meals.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
@@ -110,7 +150,7 @@ export default function Home({ navigate }) {
           ))
         )}
       </div>
-
+ 
       {showModal && (
         <AddMealModal onClose={() => setShowModal(false)} onSaved={refresh} />
       )}
