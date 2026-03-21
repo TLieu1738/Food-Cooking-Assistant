@@ -309,7 +309,6 @@ def get_meals():
         .execute()
     return jsonify(result.data)
 
-
 @app.route("/delete-meal/<meal_id>", methods=["DELETE"])
 def delete_meal(meal_id):
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
@@ -325,69 +324,6 @@ def delete_meal(meal_id):
         .eq("user_id", user.id) \
         .execute()
     return jsonify({"ok": True})
-
-
-@app.route("/friends/request", methods=["POST"])
-def send_friend_request():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    print("TOKEN RECEIVED:", token)
-    user = get_user_from_token(token)
-    print("USER:", user)
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
- 
-    sender_id = user.id
-    data = request.json
-    identifier = data.get("email")
- 
-    if not identifier:
-        return jsonify({"error": "email_required"}), 400
- 
-    # Find receiver by email or username
-    receiver = supabase.table("profiles") \
-        .select("*") \
-        .or_(f"username.eq.{identifier},email.eq.{identifier}") \
-        .execute()
- 
-    if not receiver.data:
-        return jsonify({"error": "user_not_found"}), 404
- 
-    receiver_id = receiver.data[0]["user_id"]
- 
-    if sender_id == receiver_id:
-        return jsonify({"error": "cannot_add_self"}), 400
- 
-    # Check if already friends
-    already_friends = supabase.table("friends") \
-        .select("*") \
-        .eq("user_id", sender_id) \
-        .eq("friend_id", receiver_id) \
-        .execute()
- 
-    if already_friends.data:
-        return jsonify({"error": "already_friends"}), 400
- 
-    # Check if pending request already exists in either direction
-    existing = supabase.table("friend_requests") \
-        .select("*") \
-        .eq("status", "pending") \
-        .or_(
-            f"and(sender_id.eq.{sender_id},receiver_id.eq.{receiver_id}),"
-            f"and(sender_id.eq.{receiver_id},receiver_id.eq.{sender_id})"
-        ) \
-        .execute()
- 
-    if existing.data:
-        return jsonify({"error": "request_already_exists"}), 400
- 
-    supabase.table("friend_requests").insert({
-        "sender_id": sender_id,
-        "receiver_id": receiver_id,
-        "status": "pending"
-    }).execute()
- 
-    return jsonify({"success": True}), 201
- 
  
 @app.route("/friends/accept", methods=["POST"])
 def accept_friend_request():
@@ -413,7 +349,6 @@ def accept_friend_request():
  
     req = request_data.data[0]
  
-    # Make sure the current user is the receiver
     if req["receiver_id"] != current_user_id:
         return jsonify({"error": "unauthorized"}), 403
  
@@ -425,12 +360,130 @@ def accept_friend_request():
         .eq("id", request_id) \
         .execute()
  
-    # Insert friendship both ways
     supabase.table("friends").insert([
         {"user_id": req["sender_id"], "friend_id": req["receiver_id"]},
         {"user_id": req["receiver_id"], "friend_id": req["sender_id"]}
     ]).execute()
  
+    return jsonify({"success": True}), 200
+
+@app.route("/friends/decline", methods=["POST"])
+def decline_friend_request():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    current_user_id = user.id
+    data = request.json
+    request_id = data.get("request_id")
+
+    if not request_id:
+        return jsonify({"error": "request_id_required"}), 400
+
+    request_data = supabase.table("friend_requests") \
+        .select("*") \
+        .eq("id", request_id) \
+        .execute()
+
+    if not request_data.data:
+        return jsonify({"error": "not_found"}), 404
+
+    req = request_data.data[0]
+
+    if req["receiver_id"] != current_user_id:
+        return jsonify({"error": "unauthorized"}), 403
+
+    supabase.table("friend_requests") \
+        .update({"status": "declined"}) \
+        .eq("id", request_id) \
+        .execute()
+
+    return jsonify({"success": True}), 200
+
+@app.route("/friends/requests", methods=["GET"])
+def get_friend_requests():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    requests = supabase.table("friend_requests") \
+        .select("*") \
+        .eq("receiver_id", user.id) \
+        .eq("status", "pending") \
+        .execute()
+
+    result = []
+    for req in requests.data:
+        profile = supabase.table("profiles") \
+            .select("username, email") \
+            .eq("user_id", req["sender_id"]) \
+            .execute()
+        req["profiles"] = profile.data[0] if profile.data else {}
+        result.append(req)
+
+    return jsonify(result), 200
+
+
+@app.route("/friends/list", methods=["GET"])
+def get_friends():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    friends = supabase.table("friends") \
+        .select("*") \
+        .eq("user_id", user.id) \
+        .execute()
+
+    result = []
+    for f in friends.data:
+        profile = supabase.table("profiles") \
+            .select("username, email") \
+            .eq("user_id", f["friend_id"]) \
+            .execute()
+        f["profiles"] = profile.data[0] if profile.data else {}
+        result.append(f)
+
+    return jsonify(result), 200
+
+
+@app.route("/friends/remove", methods=["DELETE"])
+def remove_friend():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    current_user_id = user.id
+    data = request.json
+    friend_id = data.get("friend_id")
+
+    if not friend_id:
+        return jsonify({"error": "friend_id_required"}), 400
+
+    supabase.table("friends") \
+        .delete() \
+        .eq("user_id", current_user_id) \
+        .eq("friend_id", friend_id) \
+        .execute()
+
+    supabase.table("friends") \
+        .delete() \
+        .eq("user_id", friend_id) \
+        .eq("friend_id", current_user_id) \
+        .execute()
+
+    supabase.table("friend_requests") \
+        .update({"status": "removed"}) \
+        .or_(
+            f"and(sender_id.eq.{current_user_id},receiver_id.eq.{friend_id}),"
+            f"and(sender_id.eq.{friend_id},receiver_id.eq.{current_user_id})"
+        ) \
+        .execute()
+
     return jsonify({"success": True}), 200
 
 #AI nutrition coach route
