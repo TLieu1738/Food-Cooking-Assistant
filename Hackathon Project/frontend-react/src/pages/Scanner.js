@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { saveMeal } from '../utils/storage';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
 
+const token = localStorage.getItem("token");
 const userProfile = {
   age: 35,
   goal: "Bulking",
@@ -85,6 +87,8 @@ export default function Scanner({ navigate }) {
     }
     setLoading(false);
   }
+
+  
 
   async function saveToDatabase() {
     if (!result || !advice) return;
