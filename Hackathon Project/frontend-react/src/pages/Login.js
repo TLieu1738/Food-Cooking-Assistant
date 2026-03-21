@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useUser } from '@civic/auth/react';
+import useCivicUser from '../utils/useCivicUser';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
@@ -11,7 +11,7 @@ export default function Login({ navigate }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { user: civicUser, signIn: civicSignIn, isLoading: civicLoading } = useUser();
+  const { user: civicUser, signIn: civicSignIn, isLoading: civicLoading } = useCivicUser();
 
   useEffect(() => {
     if (civicUser) {

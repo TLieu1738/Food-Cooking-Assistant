@@ -116,7 +116,13 @@ export default function Home({ navigate }) {
               </div>
             </button>
           ))}
-          <button className="dropdown-item danger" onClick={() => { setMenuOpen(false); /* your sign out logic */ }}>
+          <button className="dropdown-item danger" onClick={() => {
+              setMenuOpen(false);
+              localStorage.removeItem('token');
+              localStorage.removeItem('user_email');
+              localStorage.removeItem('username');
+              navigate('login');
+            }}>
             <div className="item-icon">🚪</div>
             <div>
               <div className="item-label">Sign Out</div>
@@ -196,7 +202,7 @@ export default function Home({ navigate }) {
         <button className="btn-primary" onClick={() => navigate('ingredients')}>
           <div>
             <div>Scan Ingredients</div>
-            <div className="btn-sub">Identify ingredients with your camera</div>
+            <div className="btn-sub">Discover cool dishes you can make with your ingredients!</div>
           </div>
           <span style={{ fontSize: 20 }}>→</span>
         </button>
