@@ -301,7 +301,7 @@ def save_scan():
             "protein": data["protein_g"],
             "carbs": data["carbs_g"],
             "fat": data["fat_g"],
-            "cost": data["cost"],
+            "cost": data["cost_per_serving_gbp"],
         }).execute()
 
         scan_id = scan.data[0]["id"]
