@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useUser } from '@civic/auth/react';
+import useCivicUser from '../utils/useCivicUser';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
@@ -15,7 +15,7 @@ export default function Chat({ navigate }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
-  const { user: civicUser } = useUser();
+  const { user: civicUser } = useCivicUser();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
