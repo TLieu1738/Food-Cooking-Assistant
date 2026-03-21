@@ -5,10 +5,17 @@ import os, json
 from datetime import date, datetime, timezone
 from dotenv import load_dotenv
 from coach import get_nutrition_advice
-from dbClient import supabase
+from dbClient import supabase, supabase_admin
 
 load_dotenv()
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+def get_user_from_token(token):
+    try:
+        res = supabase.auth.get_user(token)
+        return res.user if res else None
+    except Exception:
+        return None
 
 app = Flask(__name__)
 CORS(app)
@@ -152,29 +159,67 @@ health_score is 1–10 (10 = extremely nutritious). Return 3 dishes ranked by ho
 @app.route("/signup", methods=["POST"])
 def signup():
     data = request.json
+    username = data.get("username", "").strip()
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+
+    if not username:
+        return jsonify({"error": "Username is required."}), 400
+
+    # Check username is unique
+    existing = supabase.table("profiles").select("id").eq("username", username).execute()
+    if existing.data:
+        return jsonify({"error": "Username already taken."}), 400
+
     try:
         response = supabase.auth.sign_up({
-            "email": data["email"],
-            "password": data["password"]
+            "email": email,
+            "password": password,
+            "options": {"data": {"display_name": username}}
         })
-        return jsonify(response.user.model_dump())
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        user = response.user
+    except Exception:
+        return jsonify({"error": "Could not create account. That email may already be registered."}), 400
+
+    try:
+        supabase.table("profiles").insert({
+            "user_id": user.id,
+            "username": username,
+            "email": email,
+        }).execute()
+    except Exception:
+        if supabase_admin:
+            supabase_admin.auth.admin.delete_user(user.id)
+        return jsonify({"error": "Could not save username. Please try again."}), 500
+
+    return jsonify({"id": user.id, "username": username})
 
 @app.route("/login", methods=["POST"])
 def login():
     data = request.json
+    identifier = data.get("identifier", "").strip()
+    password = data.get("password", "")
+
+    # Resolve username to email if needed
+    email = identifier
+    if "@" not in identifier:
+        result = supabase.table("profiles").select("email").eq("username", identifier).execute()
+        if not result.data:
+            return jsonify({"error": "Username not found."}), 400
+        email = result.data[0]["email"]
+
     try:
-        response = supabase.auth.sign_in_with_password({
-            "email": data["email"],
-            "password": data["password"]
-        })
+        response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        # Fetch username for the response
+        profile = supabase.table("profiles").select("username").eq("email", email).execute()
+        username = profile.data[0]["username"] if profile.data else email.split("@")[0]
         return jsonify({
             "access_token": response.session.access_token,
-            "user": response.user.model_dump()
+            "username": username,
+            "email": email,
         })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+    except Exception:
+        return jsonify({"error": "Incorrect password."}), 400
 
 @app.route("/protected", methods=["GET"])
 def protected():
@@ -185,12 +230,38 @@ def protected():
 
     token = token.replace("Bearer ", "")
 
-    user = supabase.auth.get_user(token)
+    user = get_user_from_token(token)
 
     if not user:
         return {"error": "Invalid token"}, 401
 
     return {"message": "You are logged in!"}
+
+@app.route("/save-meal", methods=["POST"])
+def save_meal():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not token:
+        return jsonify({"error": "No token"}), 401
+
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Invalid token"}), 401
+
+    data = request.json
+    meal = {
+        "user_id": user.id,
+        "food_name": data.get("food_name", ""),
+        "calories": data.get("calories", 0),
+        "protein_g": data.get("protein_g", 0),
+        "carbs_g": data.get("carbs_g", 0),
+        "fat_g": data.get("fat_g", 0),
+        "cost": data.get("cost_gbp", 0),
+        "logged_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    supabase.table("meals").insert(meal).execute()
+    return jsonify({"success": True})
+
 
 @app.route("/log-meal", methods=["POST"])
 def log_meal():
@@ -198,13 +269,13 @@ def log_meal():
     if not token:
         return jsonify({"error": "No token"}), 401
 
-    user_response = supabase.auth.get_user(token)
-    if not user_response or not user_response.user:
+    user = get_user_from_token(token)
+    if not user:
         return jsonify({"error": "Invalid token"}), 401
 
     data = request.json
     meal = {
-        "user_id": user_response.user.id,
+        "user_id": user.id,
         "food_name": data.get("food_name", ""),
         "calories": data.get("calories", 0),
         "protein_g": data.get("protein_g", 0),
@@ -224,13 +295,13 @@ def get_meals():
     if not token:
         return jsonify({"error": "No token"}), 401
 
-    user_response = supabase.auth.get_user(token)
-    if not user_response or not user_response.user:
+    user = get_user_from_token(token)
+    if not user:
         return jsonify({"error": "Invalid token"}), 401
 
     today = date.today().isoformat()
     result = supabase.table("meals").select("*") \
-        .eq("user_id", user_response.user.id) \
+        .eq("user_id", user.id) \
         .gte("logged_at", today) \
         .order("logged_at") \
         .execute()
@@ -243,13 +314,13 @@ def delete_meal(meal_id):
     if not token:
         return jsonify({"error": "No token"}), 401
 
-    user_response = supabase.auth.get_user(token)
-    if not user_response or not user_response.user:
+    user = get_user_from_token(token)
+    if not user:
         return jsonify({"error": "Invalid token"}), 401
 
     supabase.table("meals").delete() \
         .eq("id", meal_id) \
-        .eq("user_id", user_response.user.id) \
+        .eq("user_id", user.id) \
         .execute()
     return jsonify({"ok": True})
 
@@ -317,6 +388,143 @@ def save_scan():
     except Exception as e:
         print(e)
         return jsonify({"error": str(e)}), 500
+    
+@app.route("/send-friend-request", methods=["POST"])
+def send_friend_request():
+    data = request.json
+    sender_id = data.get("sender_id")
+    identifier = data.get("identifier")  # username or email
+
+    # Find user by username or email
+    user = supabase.table("profiles") \
+        .select("*") \
+        .or_(f"username.eq.{identifier},email.eq.{identifier}") \
+        .execute()
+
+    if not user.data:
+        return jsonify({"error": "user_not_found"}), 404
+
+    receiver_id = user.data[0]["id"]
+
+    # Prevent sending request to yourself
+    if sender_id == receiver_id:
+        return jsonify({"error": "cannot_add_self"}), 400
+
+    # Check if request already exists
+    existing = supabase.table("friend_requests") \
+        .select("*") \
+        .or_(f"sender_id.eq.{sender_id},receiver_id.eq.{receiver_id}") \
+        .execute()
+    if existing.data:
+        return jsonify({"error": "request_already_exists"}), 400
+
+    # Insert request
+    supabase.table("friend_requests").insert({
+        "sender_id": sender_id,
+        "receiver_id": receiver_id,
+        "status": "pending"
+    }).execute()
+
+    return jsonify({"success": True})
+
+@app.route("/accept-friend-request", methods=["POST"])
+def accept_friend_request():
+    data = request.json
+    request_id = data.get("request_id")
+
+    request_data = supabase.table("friend_requests") \
+        .select("*") \
+        .eq("id", request_id) \
+        .execute()
+    
+    if not request_data.data:
+        return jsonify({"error": "not_found"}), 404
+    
+    req = request_data.data[0]
+
+    # Update status to accepted
+    supabase.table("friend_requests") \
+        .update({"status": "accepted"}) \
+        .eq("id", request_id) \
+        .execute()
+
+    # Create friendship both ways
+    supabase.table("friends").insert([
+        {"user_id": req["sender_id"], "friend_id": req["receiver_id"]},
+        {"user_id": req["receiver_id"], "friend_id": req["sender_id"]}
+    ]).execute()
+
+    return jsonify({"success": True})
+
+@app.route("/friend-requests/<user_id>")
+def get_friend_requests(user_id):
+
+    requests = supabase.table("friend_requests") \
+        .select("*, profiles!friend_requests_sender_id_fkey(username,email)") \
+        .eq("receiver_id", user_id) \
+        .eq("status", "pending") \
+        .execute()
+
+    return jsonify(requests.data)
+
+@app.route("/friends/<user_id>")
+def get_friends(user_id):
+
+    friends = supabase.table("friends") \
+        .select("friend_id") \
+        .eq("user_id", user_id) \
+        .execute()
+
+    return jsonify(friends.data)
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.json
+    messages = data.get("messages", [])
+
+    if not messages:
+        return jsonify({"error": "no_messages"}), 400
+
+    # Build meal context for authenticated users
+    meal_context = ""
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if token:
+        try:
+            chat_user = get_user_from_token(token)
+            if chat_user:
+                today = date.today().isoformat()
+                result = supabase.table("meals").select("*") \
+                    .eq("user_id", chat_user.id) \
+                    .gte("logged_at", today) \
+                    .order("logged_at") \
+                    .execute()
+                if result.data:
+                    meal_summary = ", ".join([
+                        f"{m['food_name']} ({m['calories']} kcal)"
+                        for m in result.data
+                    ])
+                    meal_context = f"\n\nThe user has logged these meals today: {meal_summary}."
+        except Exception:
+            pass
+
+    system_prompt = f"""You are NutriScan's AI Chef Assistant — a friendly, knowledgeable food and nutrition expert. You help users with:
+- Personalised nutrition advice and meal planning
+- Recipes and cooking techniques
+- Food budget optimisation (prices in GBP)
+- Health and dietary goals
+
+Be concise, practical, and conversational. Focus only on food, nutrition, cooking, and health topics.{meal_context}"""
+
+    response = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=1024,
+        system=system_prompt,
+        messages=messages
+    )
+
+    return jsonify({"reply": response.content[0].text})
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

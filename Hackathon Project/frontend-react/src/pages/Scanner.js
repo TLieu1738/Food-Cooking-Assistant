@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { saveMeal } from '../utils/storage';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
 
+const token = localStorage.getItem("token");
 const userProfile = {
   age: 35,
   goal: "Bulking",
@@ -86,17 +86,21 @@ export default function Scanner({ navigate }) {
     setLoading(false);
   }
 
+  
+
   async function saveToDatabase() {
     if (!result || !advice) return;
 
     setSaving(true);
 
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${BACKEND}/save-meal`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-browser-warning": "true"
+          "ngrok-skip-browser-warning": "true",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           food_name: result.food_name,

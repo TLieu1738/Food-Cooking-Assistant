@@ -7,16 +7,17 @@ import { getTodaysMeals, deleteMeal, getTotals } from '../utils/storage';
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 
 export default function Home({ navigate }) {
+  const token = localStorage.getItem('token');
   const [meals, setMeals] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [goals, setGoals] = useState({ calories: 2000, protein: 150, budget: 50 });
-
+ 
   useEffect(() => {
     refresh();
     fetchGoals();
   }, []);
-
+ 
   async function refresh() {
     const data = await getTodaysMeals();
     setMeals(data);
@@ -40,11 +41,15 @@ export default function Home({ navigate }) {
     refresh();
   }
 
+
+ 
   const totals = getTotals(meals);
   const today = new Date().toLocaleDateString('en-GB', {
     weekday: 'short', day: 'numeric', month: 'short'
   });
 
+  const name = localStorage.getItem('username') || localStorage.getItem('user_email')?.split('@')[0] || '';
+ 
   return (
     <div>
       {/* NAV */}
@@ -94,7 +99,7 @@ export default function Home({ navigate }) {
 
       {/* HERO */}
       <div style={{ padding: '28px 20px 16px' }}>
-        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>Good day</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>Good day{name ? `, ${name}` : ''}</div>
         <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 28, fontWeight: 800, lineHeight: 1.15 }}>
           Track your<br />
           <span style={{ color: 'var(--accent)' }}>nutrition & budget</span>
@@ -143,6 +148,13 @@ export default function Home({ navigate }) {
           <div>
             <div>Meal Log</div>
             <div className="btn-sub light">View & manage today's meals</div>
+          </div>
+          <span style={{ fontSize: 20, color: 'var(--muted)' }}>→</span>
+        </button>
+        <button className="btn-secondary" onClick={() => navigate('chat')}>
+          <div>
+            <div>AI Chef</div>
+            <div className="btn-sub light">Ask about nutrition & recipes</div>
           </div>
           <span style={{ fontSize: 20, color: 'var(--muted)' }}>→</span>
         </button>
