@@ -28,17 +28,16 @@ Respond with ONLY valid JSON:
     "next_meal_suggestions": "suggestions"
 }}
 """
-    response = client.message.create(
-        model="claude-opus-4-6",
-        max_tokens=600,
-        messages=[
-            {
-                "role":"user",
-                "content": prompt
-            }
-            
-        ],
-    )
+    response = client.messages.create(
+    model="claude-opus-4-6",
+    max_tokens=600,
+    messages=[
+        {
+            "role": "user",
+            "content": prompt
+        }
+    ],
+)
 
     clean = (
         response.content[0].text.strip().strip("```json").strip("```").strip()
