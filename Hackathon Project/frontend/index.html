@@ -71,10 +71,10 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "ngrok-skip-broswer-warning": "true"
+          "ngrok-skip-browser-warning": "true"
         },
         body: JSON.stringify({
-          userProfile: userProfile,
+          user_profile: userProfile,
           food_data: data
         })
 
@@ -83,7 +83,7 @@
       const advice = await coachRes.json();
 
       showCoachAdvice(advice);
-      status.textContext = "Done!";
+      status.textContent = "Done!";
     }
 
     function showResults(data) {
@@ -113,7 +113,7 @@
 
     function showCoachAdvice(advice) {
 
-      if (advice.error) return;
+      if (!advice || advice.error) return;
       
       let html = `
         <div class="card">
