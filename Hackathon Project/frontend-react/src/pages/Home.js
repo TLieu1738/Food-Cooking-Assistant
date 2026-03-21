@@ -3,8 +3,11 @@ import MealCard from '../components/MealCard';
 import AddMealModal from '../components/AddMealModal';
 import CalorieBar from '../components/CalorieBar';
 import { getTodaysMeals, deleteMeal, getTotals } from '../utils/storage';
- 
+
+const BACKEND = process.env.REACT_APP_BACKEND_URL;
+
 export default function Home({ navigate }) {
+  const token = localStorage.getItem('token');
   const [meals, setMeals] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
