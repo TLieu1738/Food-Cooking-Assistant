@@ -8,6 +8,7 @@ import Ingredients from './pages/Ingredients'
 import Goals from './pages/Goals';
 import Chat from './pages/Chat';
 import Friends from './pages/Friends';
+import Profile from './pages/Profile';
 import MealPlanner from './pages/MealPlanner';
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
       {page === 'goals'   && <Goals   navigate={navigate} />}
       {page === 'chat'        && <Chat        navigate={navigate} />}
       {page === 'friends'        && <Friends        navigate={navigate} />}
+      {page === 'profile'     && <Profile navigate={navigate} />}
       {page === 'planner'        && <MealPlanner    navigate={navigate} />}
     </div>
   );
