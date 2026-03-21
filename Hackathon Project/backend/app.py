@@ -84,17 +84,18 @@ If it does contain food or drink, identify what it is and respond with ONLY vali
 @app.route("/nutrition-coach", methods=["POST"])
 def nutrition_coach():
 
-    data = request.json
+    data = request.get.json()
 
     #Most likely retrieve from database (change)
     user_profile = data.get("user_profile")
     #recipe result
     food_data = data.get("food_data")
+    
+    advice = get_nutrition_advice(data["user_profile"], data["food_data"])
+    return jsonify(advice)
 
     if not user_profile or not food_data:
         return jsonify({"error": "missing_data"}), 400
-    
-    advice = get_nutrition_advice(user_profile, food_data)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000) 
