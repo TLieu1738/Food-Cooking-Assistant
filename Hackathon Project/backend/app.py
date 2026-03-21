@@ -3,15 +3,15 @@ from flask_cors import CORS
 import anthropic
 import os, json
 from dotenv import load_dotenv
+from coach import get_nutrition_advice
 from dbClient import supabase
-
-
 
 load_dotenv()
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 app = Flask(__name__)
 CORS(app)
+
 
 @app.after_request
 def add_ngrok_header(response):
@@ -21,9 +21,9 @@ def add_ngrok_header(response):
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, '..', 'frontend')
 
-@app.route("/")
-def serve_frontend():
-    return send_from_directory(FRONTEND_DIR, 'index.html')
+#@app.route("/")
+#def serve_frontend():
+ #   return send_from_directory(FRONTEND_DIR, 'index.html')
 
 @app.route("/recipes", methods=["POST"])
 def get_recipes():
@@ -121,5 +121,23 @@ def protected():
 
     return {"message": "You are logged in!"}
 
+#AI nutrition coach route
+@app.route("/nutrition-coach", methods=["POST"])
+def nutrition_coach():
+
+    data = request.get_json()
+
+    #Most likely retrieve from database (change)
+    user_profile = data.get("user_profile")
+    #recipe result
+    food_data = data.get("food_data")
+    
+        
+    if not user_profile or not food_data:
+        return jsonify({"error": "missing_data"}), 400
+
+    advice = get_nutrition_advice(user_profile, food_data)
+    return jsonify(advice)
+
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000) 
