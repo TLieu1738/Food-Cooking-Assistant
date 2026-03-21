@@ -24,20 +24,19 @@ Respond with ONLY valid JSON, no markdown or code fences:
     "next_meal_suggestion": "suggestion here"
 }}
 """
-    response = client.message.create(
-        model="claude-opus-4-6",
-        max_tokens=600,
-        messages=[
-            {
-                "role":"user",
-                "content": prompt
-            }
-            
-        ],
-    )
+    try:
+        response = client.messages.create(
+            model="claude-opus-4-6",
+            max_tokens=600,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+        )
 
         text = response.content[0].text.strip()
-        # Strip any accidental markdown fences
         if text.startswith("```"):
             text = text.split("```")[1]
             if text.startswith("json"):
@@ -49,4 +48,3 @@ Respond with ONLY valid JSON, no markdown or code fences:
     except Exception as e:
         print(f"Nutrition coach error: {e}")
         return {"error": str(e)}
-

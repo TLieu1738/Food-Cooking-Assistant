@@ -84,7 +84,7 @@ If it does contain food or drink, identify what it is and respond with ONLY vali
 @app.route("/nutrition-coach", methods=["POST"])
 def nutrition_coach():
 
-    data = request.get.json()
+    data = request.get_json()
 
     #Most likely retrieve from database (change)
     user_profile = data.get("user_profile")
