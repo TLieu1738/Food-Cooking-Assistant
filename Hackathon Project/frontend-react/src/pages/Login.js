@@ -14,8 +14,8 @@ export default function Login({ navigate }) {
       setError('Please fill in all fields.');
       return;
     }
-    if (password.length < 5) {
-      setError('Password must be at least 5 characters.');
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
       return;
     }
     setLoading(true);
