@@ -23,6 +23,11 @@ export default function Scanner({ navigate }) {
 
   useEffect(() => {
     initCamera();
+    const video = videoRef.current;
+    return () => {
+      const stream = video?.srcObject;
+      if (stream) stream.getTracks().forEach(t => t.stop());
+    };
   }, []);
 
   async function initCamera() {

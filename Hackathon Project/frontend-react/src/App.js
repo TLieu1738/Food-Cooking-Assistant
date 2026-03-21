@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Home from './pages/Home';
 import Scanner from './pages/Scanner';
 import Log from './pages/Log';
+import Ingredients from './pages/Ingredients'
 
 export default function App() {
   const [page, setPage] = useState('login');
@@ -18,6 +19,7 @@ export default function App() {
       {page === 'login'   && <Login   navigate={navigate} />}
       {page === 'home'    && <Home    navigate={navigate} />}
       {page === 'scanner' && <Scanner navigate={navigate} />}
+      {page === 'ingredients' && <Ingredients navigate={navigate} />}
       {page === 'log'     && <Log     navigate={navigate} />}
     </div>
   );

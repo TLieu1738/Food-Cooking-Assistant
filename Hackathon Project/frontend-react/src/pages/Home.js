@@ -10,12 +10,13 @@ export default function Home({ navigate }) {
 
   useEffect(() => { refresh(); }, []);
 
-  function refresh() {
-    setMeals(getTodaysMeals());
+  async function refresh() {
+    const data = await getTodaysMeals();
+    setMeals(data);
   }
 
-  function handleDelete(id) {
-    deleteMeal(id);
+  async function handleDelete(id) {
+    await deleteMeal(id);
     refresh();
   }
 
@@ -69,6 +70,13 @@ export default function Home({ navigate }) {
           <div>
             <div>Scan Food</div>
             <div className="btn-sub">Identify food with your camera</div>
+          </div>
+          <span style={{ fontSize: 20 }}>→</span>
+        </button>
+        <button className="btn-primary" onClick={() => navigate('ingredients')}>
+          <div>
+            <div>Scan Ingredients</div>
+            <div className="btn-sub">Identify ingredients with your camera</div>
           </div>
           <span style={{ fontSize: 20 }}>→</span>
         </button>
