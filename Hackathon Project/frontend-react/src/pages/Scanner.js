@@ -201,7 +201,7 @@ export default function Scanner({ navigate }) {
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
                 Estimated cost <strong style={{ color: 'var(--accent)' }}>£{result.cost_per_serving_gbp.toFixed(2)}/serving</strong>
               </div>
-              <button
+              {/* <button
                 onClick={addToLog}
                 disabled={addedToLog || saving}
                 style={{
@@ -214,7 +214,7 @@ export default function Scanner({ navigate }) {
                   cursor: addedToLog ? 'default' : 'pointer'
                 }}>
                 {saving ? <><span className="spinner" />Saving...</> : addedToLog ? '✓ Added to log!' : '+ Add to today\'s meal log'}
-              </button>
+              </button> */}
             </div>
 
             {/* RECIPES */}
