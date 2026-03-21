@@ -588,6 +588,45 @@ def save_scan():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/goals", methods=["GET"])
+def get_goals():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    result = supabase.table("goals").select("*").eq("user_id", user.id).execute()
+    if result.data:
+        return jsonify(result.data[0])
+    return jsonify({"calories": 2000, "protein": 150, "budget": 50})
+
+
+@app.route("/goals", methods=["POST"])
+def save_goals():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.json
+    existing = supabase.table("goals").select("id").eq("user_id", user.id).execute()
+    if existing.data:
+        supabase.table("goals").update({
+            "calories": data.get("calories", 2000),
+            "protein": data.get("protein", 150),
+            "budget": data.get("budget", 50),
+        }).eq("user_id", user.id).execute()
+    else:
+        supabase.table("goals").insert({
+            "user_id": user.id,
+            "calories": data.get("calories", 2000),
+            "protein": data.get("protein", 150),
+            "budget": data.get("budget", 50),
+        }).execute()
+
+    return jsonify({"success": True})
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.json
