@@ -46,7 +46,7 @@ export default function Scanner({ navigate }) {
     setAdvice(null);
     setSaving(false);
     setSaved(false);
-    setStatus('Analysing with Claude Vision...');
+    setStatus('Analysing food...');
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -72,7 +72,7 @@ export default function Scanner({ navigate }) {
         return;
       }
 
-      setStatus('Getting nutrition advice, bear with me gng...');
+      setStatus('Getting nutrition advice...');
 
       const coachRes = await fetch(`${BACKEND}/nutrition-coach`, {
         method: 'POST',

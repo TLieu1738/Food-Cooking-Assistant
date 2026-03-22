@@ -30,7 +30,7 @@ export default function Ingredients({ navigate }) {
     setLoading(true);
     setResult(null);
     setExpandedDish(null);
-    setStatus('Identifying ingredients with Claude Vision...');
+    setStatus('Cooking up dishes...');
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
