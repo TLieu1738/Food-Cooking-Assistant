@@ -390,6 +390,62 @@ def get_week_meals():
         return jsonify(response)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+    
+@app.route("/friends/request", methods=["POST"])
+def send_friend_request():
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    sender_id = user.id
+    data = request.json
+    identifier = data.get("email")
+
+    if not identifier:
+        return jsonify({"error": "email_required"}), 400
+
+    receiver = supabase.table("profiles") \
+        .select("*") \
+        .or_(f"username.eq.{identifier},email.eq.{identifier}") \
+        .execute()
+
+    if not receiver.data:
+        return jsonify({"error": "user_not_found"}), 404
+
+    receiver_id = receiver.data[0]["user_id"]
+
+    if sender_id == receiver_id:
+        return jsonify({"error": "cannot_add_self"}), 400
+
+    already_friends = supabase.table("friends") \
+        .select("*") \
+        .eq("user_id", sender_id) \
+        .eq("friend_id", receiver_id) \
+        .execute()
+
+    if already_friends.data:
+        return jsonify({"error": "already_friends"}), 400
+
+    existing = supabase.table("friend_requests") \
+        .select("*") \
+        .eq("status", "pending") \
+        .or_(
+            f"and(sender_id.eq.{sender_id},receiver_id.eq.{receiver_id}),"
+            f"and(sender_id.eq.{receiver_id},receiver_id.eq.{sender_id})"
+        ) \
+        .execute()
+
+    if existing.data:
+        return jsonify({"error": "request_already_exists"}), 400
+
+    supabase.table("friend_requests").insert({
+        "sender_id": sender_id,
+        "receiver_id": receiver_id,
+        "status": "pending"
+    }).execute()
+
+    return jsonify({"success": True}), 201
 
 
 @app.route("/friends/accept", methods=["POST"])
