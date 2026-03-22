@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import AddToPlanModal from '../components/AddToPlanModal';
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
+const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
 const userProfile = {
   age: 35,
@@ -50,10 +50,12 @@ export default function Scanner({ navigate }) {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const base64 = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+    const maxW = 800;
+    const scale = Math.min(1, maxW / video.videoWidth);
+    canvas.width = video.videoWidth * scale;
+    canvas.height = video.videoHeight * scale;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const base64 = canvas.toDataURL('image/jpeg', 0.6).split(',')[1];
 
     try {
       const res = await fetch(`${BACKEND}/recipes`, {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL;
 

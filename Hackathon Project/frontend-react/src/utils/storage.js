@@ -27,10 +27,17 @@ export async function getTodaysMeals() {
     handleExpired(data);
     return [];
   }
-  return data.map(m => ({
-    ...m,
-    timestamp: m.logged_at
-  }));
+  return data.map(m => ({ ...m, timestamp: m.logged_at }));
+}
+
+export async function getRecentMeals(days = 7) {
+  const res = await fetch(`${BACKEND}/get-meals?days=${days}`, { headers: authHeaders() });
+  const data = await res.json();
+  if (data.error) {
+    handleExpired(data);
+    return [];
+  }
+  return data.map(m => ({ ...m, timestamp: m.logged_at }));
 }
 
 export async function saveMeal(meal) {

@@ -19,14 +19,14 @@ def get_user_from_token(token):
 
 app = Flask(__name__)
 
-CORS(app, origins="*", allow_headers=["Content-Type", "Authorization"],
+CORS(app, origins="*", allow_headers=["Content-Type", "Authorization", "ngrok-skip-browser-warning"],
      methods=["GET", "POST", "DELETE", "OPTIONS"],
      supports_credentials=False)
 
 @app.after_request
 def after_request(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, ngrok-skip-browser-warning'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
     response.headers['ngrok-skip-browser-warning'] = 'true'
     return response
@@ -35,7 +35,7 @@ def after_request(response):
 def options_handler(path):
     response = jsonify({})
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, ngrok-skip-browser-warning'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
     return response, 200
 
@@ -231,7 +231,6 @@ def protected():
         return {"error": "Invalid token"}, 401
     return {"message": "You are logged in!"}
 
-<<<<<<< HEAD
 @app.route("/save-meal", methods=["POST"])
 def save_meal():
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
@@ -261,8 +260,6 @@ def save_meal():
         print("save_meal error:", e)
         return jsonify({"error": str(e)}), 500
 
-=======
->>>>>>> 38931a11db02a97c7206e3ca75fd6d0f975fbace
 
 @app.route("/log-meal", methods=["POST"])
 def log_meal():
@@ -288,30 +285,6 @@ def log_meal():
     return jsonify(result.data[0] if result.data else meal)
 
 
-@app.route("/save-meal", methods=["POST"])
-def save_meal():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    if not token:
-        return jsonify({"error": "No token"}), 401
-    user = get_user_from_token(token)
-    if not user:
-        return jsonify({"error": "Invalid token"}), 401
-
-    data = request.json
-    meal = {
-        "user_id": user.id,
-        "food_name": data.get("food_name", ""),
-        "calories": data.get("calories", 0),
-        "protein_g": data.get("protein_g", 0),
-        "carbs_g": data.get("carbs_g", 0),
-        "fat_g": data.get("fat_g", 0),
-        "cost": data.get("cost_gbp", 0),
-        "logged_at": datetime.now(timezone.utc).isoformat(),
-    }
-    supabase.table("meals").insert(meal).execute()
-    return jsonify({"success": True})
-
-
 @app.route("/get-meals", methods=["GET"])
 def get_meals():
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
@@ -321,13 +294,19 @@ def get_meals():
     if not user:
         return jsonify({"error": "Invalid token"}), 401
 
-    today = date.today().isoformat()
-    result = supabase.table("meals").select("*") \
-        .eq("user_id", user.id) \
-        .gte("logged_at", today) \
-        .order("logged_at") \
-        .execute()
-    return jsonify(result.data)
+    days_back = int(request.args.get("days", 1))
+    since = (date.today() - timedelta(days=days_back - 1)).isoformat()
+    for _ in range(3):
+        try:
+            result = supabase.table("meals").select("*") \
+                .eq("user_id", user.id) \
+                .gte("logged_at", since) \
+                .order("logged_at") \
+                .execute()
+            return jsonify(result.data)
+        except Exception:
+            continue
+    return jsonify([])
 
 
 @app.route("/delete-meal/<meal_id>", methods=["DELETE"])
@@ -349,37 +328,38 @@ def delete_meal(meal_id):
 @app.route("/goals", methods=["GET"])
 def get_goals():
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    if not token:
-        return jsonify({"error": "No token"}), 401
-    try:
-        user = supabase.auth.get_user(token)
-        user_id = user.user.id
-        result = supabase.table("goals").select("*").eq("user_id", user_id).single().execute()
-        if result.data:
-            return jsonify(result.data)
-        return jsonify({"calories": 2000, "protein": 150, "budget": 50.00})
-    except Exception:
-        return jsonify({"calories": 2000, "protein": 150, "budget": 50.00})
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    result = supabase.table("goals").select("*").eq("user_id", user.id).execute()
+    if result.data:
+        return jsonify(result.data[0])
+    return jsonify({"calories": 2000, "protein": 150, "budget": 50})
 
 
 @app.route("/goals", methods=["POST"])
 def save_goals():
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    if not token:
-        return jsonify({"error": "No token"}), 401
+    user = get_user_from_token(token)
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.json
     try:
-        user = supabase.auth.get_user(token)
-        user_id = user.user.id
-        data = request.json
-        payload = {
-            "user_id": user_id,
-            "calories": int(data.get("calories", 2000)),
-            "protein": int(data.get("protein", 150)),
-            "budget": float(data.get("budget", 50.00)),
-            "updated_at": "now()"
-        }
-        result = supabase.table("goals").upsert(payload, on_conflict="user_id").execute()
-        return jsonify(result.data[0])
+        existing = supabase.table("goals").select("id").eq("user_id", user.id).execute()
+        if existing.data:
+            supabase.table("goals").update({
+                "calories": int(data.get("calories", 2000)),
+                "protein": int(data.get("protein", 150)),
+                "budget": float(data.get("budget", 50)),
+            }).eq("user_id", user.id).execute()
+        else:
+            supabase.table("goals").insert({
+                "user_id": user.id,
+                "calories": int(data.get("calories", 2000)),
+                "protein": int(data.get("protein", 150)),
+                "budget": float(data.get("budget", 50)),
+            }).execute()
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -546,13 +526,9 @@ def chat():
     if not messages:
         return jsonify({"error": "no_messages"}), 400
 
-<<<<<<< HEAD
     chat_user = None
     meal_context = ""
     goals_context = ""
-=======
-    meal_context = ""
->>>>>>> 38931a11db02a97c7206e3ca75fd6d0f975fbace
     token = request.headers.get("Authorization", "").replace("Bearer ", "")
     if token:
         try:
@@ -570,13 +546,10 @@ def chat():
                         for m in result.data
                     ])
                     meal_context = f"\n\nThe user has logged these meals today: {meal_summary}."
-<<<<<<< HEAD
                 goals_result = supabase.table("goals").select("*").eq("user_id", chat_user.id).execute()
                 if goals_result.data:
                     g = goals_result.data[0]
                     goals_context = f"\n\nThe user's current goals: {g.get('calories', 2000)} kcal/day, {g.get('protein', 150)}g protein/day, £{g.get('budget', 50)} weekly budget."
-=======
->>>>>>> 38931a11db02a97c7206e3ca75fd6d0f975fbace
         except Exception:
             pass
 
@@ -587,7 +560,6 @@ def chat():
 - Health and dietary goals
 
 Be concise, practical, and conversational. Focus only on food, nutrition, cooking, and health topics.
-<<<<<<< HEAD
 Do NOT use markdown formatting — no headers, no bold, no bullet symbols like * or #. Use plain sentences and simple line breaks only.
 When you update goals, confirm exactly what was set in a short, friendly sentence.{meal_context}{goals_context}"""
 
@@ -605,15 +577,11 @@ When you update goals, confirm exactly what was set in a short, friendly sentenc
             }
         }
     ]
-=======
-Do NOT use markdown formatting — no headers, no bold, no bullet symbols like * or #. Use plain sentences and simple line breaks only.{meal_context}"""
->>>>>>> 38931a11db02a97c7206e3ca75fd6d0f975fbace
 
     response = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=1024,
         system=system_prompt,
-<<<<<<< HEAD
         tools=tools,
         messages=messages
     )
@@ -730,57 +698,5 @@ def delete_meal_plan(entry_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
-
-# Add these routes to your existing app.py
-
-@app.route("/goals", methods=["GET"])
-def get_goals():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user = get_user_from_token(token)
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    result = supabase.table("goals").select("*").eq("user_id", user.id).execute()
-    if result.data:
-        return jsonify(result.data[0])
-    return jsonify({"calories": 2000, "protein": 150, "budget": 50})
-
-
-@app.route("/goals", methods=["POST"])
-def save_goals():
-    token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    user = get_user_from_token(token)
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.json
-    try:
-        existing = supabase.table("goals").select("id").eq("user_id", user.id).execute()
-        if existing.data:
-            supabase.table("goals").update({
-                "calories": int(data.get("calories", 2000)),
-                "protein": int(data.get("protein", 150)),
-                "budget": float(data.get("budget", 50)),
-            }).eq("user_id", user.id).execute()
-        else:
-            supabase.table("goals").insert({
-                "user_id": user.id,
-                "calories": int(data.get("calories", 2000)),
-                "protein": int(data.get("protein", 150)),
-                "budget": float(data.get("budget", 50)),
-            }).execute()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-=======
-        messages=messages
-    )
-
-    return jsonify({"reply": response.content[0].text})
-
-
-if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
->>>>>>> 38931a11db02a97c7206e3ca75fd6d0f975fbace
+    app.run(debug=True, host="0.0.0.0", port=port)
